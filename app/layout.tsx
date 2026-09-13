@@ -3,7 +3,7 @@ import './globals.css';
 import React, { useState } from 'react';
 import Link from 'next/link';
 import { Sparkles, Compass, BarChart2, Target } from 'lucide-react';
-import { BeaconDrawer } from '@/components/beacon/BeaconDrawer';
+import { BeaconDrawer } from '../components/beacon/BeaconDrawer';
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   const [isBeaconOpen, setIsBeaconOpen] = useState(false);
