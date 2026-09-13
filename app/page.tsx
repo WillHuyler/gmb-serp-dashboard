@@ -1,7 +1,7 @@
 "use client";
 import React, { useState, useEffect } from 'react';
 import { createClient } from '@supabase/supabase-js';
-import { BarChart3, Users, Search, Activity, RefreshCw } from 'lucide-react';
+import { Plus, CheckCircle, ArrowUp, ArrowDown, Minus } from 'lucide-react';
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL || '',
@@ -9,112 +9,190 @@ const supabase = createClient(
 );
 
 export default function Dashboard() {
-  const [activeTab, setActiveTab] = useState<'summary' | 'intelligence' | 'roster'>('summary');
   const [clients, setClients] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [selectedClient, setSelectedClient] = useState<string>('');
+  const [keywords, setKeywords] = useState<any[]>([]);
+  const [newKeyword, setNewKeyword] = useState<string>('');
+  const [location, setLocation] = useState<string>('Stroudsburg, Pennsylvania');
 
   useEffect(() => {
-    async function loadData() {
-      const { data } = await supabase.from('clients').select('*, gmb_serp_metrics(*)');
-      if (data) setClients(data);
-      setLoading(false);
-    }
-    loadData();
+    loadClients();
   }, []);
+
+  useEffect(() => {
+    if (selectedClient) loadKeywords();
+  }, [selectedClient]);
+
+  async function loadClients() {
+    const { data } = await supabase.from('clients').select('*');
+    if (data && data.length > 0) {
+      setClients(data);
+      setSelectedClient(data[0].id);
+    }
+  }
+
+  async function loadKeywords() {
+    const { data } = await supabase
+      .from('keyword_library')
+      .select('*, rank_history(*)')
+      .eq('client_id', selectedClient);
+
+    if (data) setKeywords(data);
+  }
+
+  const handleAddKeyword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newKeyword || !selectedClient) return;
+
+    const activeCount = keywords.filter((k) => k.is_active).length;
+    if (activeCount >= 5) {
+      alert("Active quota reached! You can only track 5 active keywords per client. Prune an underperforming keyword before adding a new one.");
+      return;
+    }
+
+    await supabase.from('keyword_library').insert({
+      client_id: selectedClient,
+      keyword: newKeyword.trim(),
+      location: location,
+      is_active: true,
+    });
+
+    setNewKeyword('');
+    loadKeywords();
+  };
+
+  const toggleKeywordStatus = async (id: number, currentStatus: boolean) => {
+    if (!currentStatus) {
+      const activeCount = keywords.filter((k) => k.is_active).length;
+      if (activeCount >= 5) {
+        alert("Cannot activate! Client already has 5 active keywords.");
+        return;
+      }
+    }
+
+    await supabase
+      .from('keyword_library')
+      .update({ is_active: !currentStatus })
+      .eq('id', id);
+
+    loadKeywords();
+  };
+
+  const renderRankChange = (history: any[]) => {
+    if (!history || history.length === 0) return <span className="text-slate-500">Pending Run</span>;
+    
+    const sorted = [...history].sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+    const latest = sorted[0];
+    const previous = sorted[1];
+
+    if (!previous) {
+      return (
+        <span className="font-bold text-emerald-400">
+          #{latest.serp_rank} <span className="text-xs text-slate-500 font-normal">(New)</span>
+        </span>
+      );
+    }
+
+    const diff = previous.serp_rank - latest.serp_rank;
+    return (
+      <div className="flex items-center gap-2">
+        <span className="font-bold text-white">#{latest.serp_rank}</span>
+        {diff > 0 && <span className="text-xs text-emerald-400 flex items-center"><ArrowUp className="w-3 h-3"/> +{diff}</span>}
+        {diff < 0 && <span className="text-xs text-rose-400 flex items-center"><ArrowDown className="w-3 h-3"/> {diff}</span>}
+        {diff === 0 && <span className="text-xs text-slate-500 flex items-center"><Minus className="w-3 h-3"/> 0</span>}
+      </div>
+    );
+  };
 
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 p-8">
-      {/* Top Bar */}
       <div className="flex justify-between items-center mb-8 border-b border-slate-800 pb-4">
         <div>
           <h1 className="text-2xl font-bold bg-gradient-to-r from-blue-400 to-teal-400 bg-clip-text text-transparent">
             Dominate Ignite Portal
           </h1>
-          <p className="text-sm text-slate-400">GMB & SERP Telemetry Engine</p>
+          <p className="text-sm text-slate-400">Historical SERP Telemetry & Keyword Manager</p>
         </div>
-        <div className="flex items-center gap-2 text-xs bg-slate-900 border border-slate-800 px-3 py-1.5 rounded-full text-emerald-400">
-          <Activity className="w-4 h-4" /> Live Sync Active
+
+        <div className="flex items-center gap-3">
+          <label className="text-sm text-slate-400">Selected Client:</label>
+          <select
+            value={selectedClient}
+            onChange={(e) => setSelectedClient(e.target.value)}
+            className="bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-blue-500"
+          >
+            {clients.map((c) => (
+              <option key={c.id} value={c.id}>{c.name}</option>
+            ))}
+          </select>
         </div>
       </div>
 
-      {/* Primary Tab Navigation */}
-      <div className="flex gap-4 mb-8 border-b border-slate-800">
-        <button
-          onClick={() => setActiveTab('summary')}
-          className={`pb-3 px-2 flex items-center gap-2 font-medium text-sm border-b-2 transition-all ${
-            activeTab === 'summary'
-              ? 'border-blue-500 text-blue-400'
-              : 'border-transparent text-slate-400 hover:text-slate-200'
-          }`}
-        >
-          <BarChart3 className="w-4 h-4" /> Executive Summary
+      <form onSubmit={handleAddKeyword} className="bg-slate-900 border border-slate-800 p-4 rounded-xl mb-8 flex flex-wrap gap-4 items-center">
+        <input
+          type="text"
+          placeholder="Enter keyword (e.g., auto repair stroudsburg)"
+          value={newKeyword}
+          onChange={(e) => setNewKeyword(e.target.value)}
+          className="flex-1 bg-slate-800 border border-slate-700 rounded-lg px-4 py-2 text-sm text-white focus:outline-none focus:border-blue-500"
+        />
+        <input
+          type="text"
+          placeholder="Location"
+          value={location}
+          onChange={(e) => setLocation(e.target.value)}
+          className="bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white"
+        />
+        <button type="submit" className="bg-blue-600 hover:bg-blue-500 text-white px-4 py-2 rounded-lg text-sm font-medium flex items-center gap-2">
+          <Plus className="w-4 h-4" /> Add to Tracker
         </button>
-        <button
-          onClick={() => setActiveTab('intelligence')}
-          className={`pb-3 px-2 flex items-center gap-2 font-medium text-sm border-b-2 transition-all ${
-            activeTab === 'intelligence'
-              ? 'border-blue-500 text-blue-400'
-              : 'border-transparent text-slate-400 hover:text-slate-200'
-          }`}
-        >
-          <Search className="w-4 h-4" /> Search & Local Intelligence
-        </button>
-        <button
-          onClick={() => setActiveTab('roster')}
-          className={`pb-3 px-2 flex items-center gap-2 font-medium text-sm border-b-2 transition-all ${
-            activeTab === 'roster'
-              ? 'border-blue-500 text-blue-400'
-              : 'border-transparent text-slate-400 hover:text-slate-200'
-          }`}
-        >
-          <Users className="w-4 h-4" /> Account Roster ({clients.length})
-        </button>
+      </form>
+
+      <div className="bg-slate-900 border border-slate-800 rounded-xl overflow-hidden">
+        <table className="w-full text-left text-sm text-slate-300">
+          <thead className="bg-slate-800 text-slate-400 uppercase text-xs">
+            <tr>
+              <th className="p-4">Keyword</th>
+              <th className="p-4">Location</th>
+              <th className="p-4">Status</th>
+              <th className="p-4">Current Rank & Shift</th>
+              <th className="p-4">Action / Prune</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-slate-800">
+            {keywords.map((kw) => (
+              <tr key={kw.id} className="hover:bg-slate-800/50">
+                <td className="p-4 font-medium text-white">{kw.keyword}</td>
+                <td className="p-4 text-slate-400">{kw.location}</td>
+                <td className="p-4">
+                  {kw.is_active ? (
+                    <span className="inline-flex items-center gap-1 text-xs bg-emerald-500/10 text-emerald-400 px-2 py-1 rounded-full border border-emerald-500/20">
+                      <CheckCircle className="w-3 h-3" /> Active
+                    </span>
+                  ) : (
+                    <span className="inline-flex items-center gap-1 text-xs bg-slate-800 text-slate-500 px-2 py-1 rounded-full border border-slate-700">
+                      Archived
+                    </span>
+                  )}
+                </td>
+                <td className="p-4">{renderRankChange(kw.rank_history)}</td>
+                <td className="p-4">
+                  <button
+                    onClick={() => toggleKeywordStatus(kw.id, kw.is_active)}
+                    className={`text-xs px-3 py-1.5 rounded-lg border transition-all ${
+                      kw.is_active
+                        ? 'border-rose-500/30 text-rose-400 hover:bg-rose-500/10'
+                        : 'border-blue-500/30 text-blue-400 hover:bg-blue-500/10'
+                    }`}
+                  >
+                    {kw.is_active ? 'Prune (Deactivate)' : 'Reactivate'}
+                  </button>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
       </div>
-
-      {/* Dynamic Tab Views */}
-      {loading ? (
-        <div className="flex items-center justify-center h-64 text-slate-500">
-          <RefreshCw className="w-6 h-6 animate-spin mr-2" /> Fetching latest metrics...
-        </div>
-      ) : (
-        <div>
-          {activeTab === 'summary' && (
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-              <div className="bg-slate-900 border border-slate-800 p-6 rounded-xl">
-                <span className="text-slate-400 text-sm">Total Accounts</span>
-                <p className="text-3xl font-bold mt-2 text-white">{clients.length}</p>
-              </div>
-              <div className="bg-slate-900 border border-slate-800 p-6 rounded-xl">
-                <span className="text-slate-400 text-sm">Pipeline Status</span>
-                <p className="text-3xl font-bold mt-2 text-emerald-400">Operational</p>
-              </div>
-            </div>
-          )}
-
-          {activeTab === 'roster' && (
-            <div className="bg-slate-900 border border-slate-800 rounded-xl overflow-hidden">
-              <table className="w-full text-left text-sm text-slate-300">
-                <thead className="bg-slate-800 text-slate-400 uppercase text-xs">
-                  <tr>
-                    <th className="p-4">Client Name</th>
-                    <th className="p-4">Store Code</th>
-                    <th className="p-4">Address</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-800">
-                  {clients.map((c) => (
-                    <tr key={c.id} className="hover:bg-slate-800/50">
-                      <td className="p-4 font-medium text-white">{c.name}</td>
-                      <td className="p-4 text-slate-400">{c.store_code || 'N/A'}</td>
-                      <td className="p-4 text-slate-400">{c.address || 'N/A'}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </div>
-      )}
     </div>
   );
 }
