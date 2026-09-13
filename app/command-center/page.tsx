@@ -1,6 +1,7 @@
 "use client";
 import React from 'react';
-import { Sparkles, TrendingUp, DollarSign, Users, PhoneCall, ArrowUpRight, Lock, Search, Bot } from 'lucide-react';
+import { Sparkles, Lock, Search, Bot } from 'lucide-react';
+import { MarketingTimeline } from '../../components/timeline/MarketingTimeline';
 
 export default function CommandCenterPage() {
   return (
@@ -121,6 +122,10 @@ export default function CommandCenterPage() {
         </div>
 
       </div>
+
+      {/* Cross-Channel Event Overlay Timeline */}
+      <MarketingTimeline />
+
     </div>
   );
 }
