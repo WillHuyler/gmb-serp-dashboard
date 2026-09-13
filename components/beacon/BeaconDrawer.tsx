@@ -48,6 +48,7 @@ export function BeaconDrawer({ isOpen, onClose, clientName }: BeaconDrawerProps)
   return (
     <div className="fixed inset-y-0 right-0 w-[450px] bg-[#0E192B] border-l border-[#A9C7E5]/15 shadow-2xl z-50 flex flex-col justify-between font-sans">
       
+      {/* Header */}
       <div className="p-5 border-b border-[#A9C7E5]/10 flex justify-between items-center bg-[#08111F]">
         <div className="flex items-center gap-2.5">
           <div className="p-2 bg-[#F5A000]/10 border border-[#F5A000]/30 rounded-lg">
@@ -63,6 +64,7 @@ export function BeaconDrawer({ isOpen, onClose, clientName }: BeaconDrawerProps)
         </button>
       </div>
 
+      {/* Messages */}
       <div className="flex-1 overflow-y-auto p-5 space-y-4">
         {messages.map((m, i) => (
           <div key={i} className={`flex flex-col ${m.sender === 'user' ? 'items-end' : 'items-start'}`}>
@@ -114,6 +116,7 @@ export function BeaconDrawer({ isOpen, onClose, clientName }: BeaconDrawerProps)
         )}
       </div>
 
+      {/* Input */}
       <form onSubmit={handleSend} className="p-4 bg-[#08111F] border-t border-[#A9C7E5]/10 flex gap-2">
         <input
           type="text"
