@@ -1,7 +1,7 @@
 "use client";
 import React, { useState } from 'react';
 import { Sliders, Target } from 'lucide-react';
-import { DecisionEngine, PredictionOutcome } from '@/lib/decision-engine';
+import { DecisionEngine, PredictionOutcome } from '../../lib/decision-engine';
 
 export default function OutcomeLab() {
   const [tab, setTab] = useState<'forward' | 'reverse'>('forward');
