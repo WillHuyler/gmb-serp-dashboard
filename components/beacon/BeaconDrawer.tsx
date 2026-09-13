@@ -1,7 +1,7 @@
 "use client";
 import React, { useState } from 'react';
 import { Sparkles, X, Send, ShieldCheck } from 'lucide-react';
-import { DecisionEngine } from '@/lib/decision-engine';
+import { DecisionEngine } from '../../lib/decision-engine';
 
 interface BeaconDrawerProps {
   isOpen: boolean;
