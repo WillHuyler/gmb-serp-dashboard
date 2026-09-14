@@ -36,9 +36,9 @@ export class DecisionEngine {
 
     const interventions: SignalIntervention[] = [];
 
-    for (const kw of keywords) {
-      const history = (kw as any).rank_history || [];
-      if (history.length < 2) continue;
+    (keywords as any[]).forEach((kw) => {
+      const history = kw.rank_history || [];
+      if (history.length < 2) return;
 
       const latestRank = history[0].serp_rank;
       const previousRank = history[1].serp_rank;
@@ -55,7 +55,7 @@ export class DecisionEngine {
           recommended_action: 'Audit primary GBP category assignment and request immediate local citation sync.',
         });
       }
-    }
+    });
 
     return interventions;
   }
