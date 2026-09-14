@@ -3,7 +3,7 @@
 import React, { useState, useEffect, Suspense } from 'react';
 import { createClient } from '@supabase/supabase-js';
 import { useSearchParams, useRouter, usePathname } from 'next/navigation';
-import { Sparkles, Lock, RefreshCw, Printer, Target } from 'lucide-react';
+import { Sparkles, Lock, RefreshCw, Printer, Target, AlertTriangle } from 'lucide-react';
 
 import { MarketingTimeline } from '../../components/timeline/MarketingTimeline';
 import { DemoControls } from '../../components/demo/DemoControls';
@@ -24,6 +24,7 @@ function CommandCenterContent() {
   const [clients, setClients] = useState<any[]>([]);
   const [selectedClient, setSelectedClient] = useState<string>('');
   const [keywords, setKeywords] = useState<any[]>([]);
+  const [signals, setSignals] = useState<any[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [demoAnomaly, setDemoAnomaly] = useState<string>('baseline');
 
@@ -56,6 +57,7 @@ function CommandCenterContent() {
   useEffect(() => {
     if (selectedClient) {
       loadClientTelemetry();
+      loadClientSignals();
     }
   }, [selectedClient]);
 
@@ -66,12 +68,19 @@ function CommandCenterContent() {
       .select('*, rank_history(*)')
       .eq('client_id', selectedClient);
 
-    if (data) {
-      setKeywords(data);
-    } else {
-      setKeywords([]);
-    }
+    setKeywords(data || []);
     setLoading(false);
+  }
+
+  async function loadClientSignals() {
+    const { data } = await supabase
+      .from('signals')
+      .select('*')
+      .eq('client_id', selectedClient)
+      .eq('is_resolved', false)
+      .order('created_at', { ascending: false });
+
+    setSignals(data || []);
   }
 
   const handleClientChange = (clientId: string) => {
@@ -86,8 +95,8 @@ function CommandCenterContent() {
   };
 
   const currentClientObj = clients.find((c) => c.id === selectedClient);
-
   const activeKeywords = keywords.filter((k) => k.is_active);
+
   const visibilityMetric: CanonicalMetricResult<number> = MetricRegistry.calculateLocalVisibility(
     currentClientObj?.tenant_id || '',
     selectedClient,
@@ -104,6 +113,8 @@ function CommandCenterContent() {
   const certStatus: CertificationStatus = currentClientObj?.data_certification_status || 
     (visibilityMetric.healthStatus === 'VALID' ? 'DATA_CERTIFIED' : 'DATA_REVIEW_REQUIRED');
 
+  const criticalSignal = signals.find((s) => s.severity === 'CRITICAL');
+
   return (
     <div className="p-8 max-w-[1600px] mx-auto space-y-8 font-sans print:p-0 print:bg-white">
       
@@ -112,7 +123,7 @@ function CommandCenterContent() {
         <DemoControls onTriggerScenario={(scenario) => setDemoAnomaly(scenario)} />
       </div>
 
-      {/* Header, Client Switcher, Target Pacing & Certification Badge */}
+      {/* Header Controls */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div className="space-y-1">
           <div className="flex items-center gap-3">
@@ -172,7 +183,9 @@ function CommandCenterContent() {
         </div>
 
         <h2 className="text-base font-bold text-white print:text-black mb-2">
-          {visibilityMetric.healthStatus === 'DATA_UNAVAILABLE'
+          {criticalSignal 
+            ? `Critical Alert: ${criticalSignal.title}`
+            : visibilityMetric.healthStatus === 'DATA_UNAVAILABLE'
             ? `Telemetry Notice: No Active Keywords Tracked for ${currentClientObj?.name || 'Client'}`
             : demoAnomaly === 'rank_drop'
             ? 'Critical Alert: Local Visibility Loss (-28%) Detected across Zip Codes'
@@ -180,7 +193,9 @@ function CommandCenterContent() {
         </h2>
 
         <p className="text-xs text-[#A9C7E5] print:text-gray-800 leading-relaxed max-w-4xl">
-          {visibilityMetric.healthStatus === 'DATA_UNAVAILABLE'
+          {criticalSignal
+            ? `${criticalSignal.message} Recommended Action: ${criticalSignal.recommended_action}`
+            : visibilityMetric.healthStatus === 'DATA_UNAVAILABLE'
             ? 'Add search terms with assigned target Zip Codes in OtterWatch SERP to calculate real-time visibility scores.'
             : demoAnomaly === 'rank_drop'
             ? 'Recent local pack shift displaced primary category terms into position #6+. Immediate GBP secondary listing update recommended.'
@@ -188,7 +203,7 @@ function CommandCenterContent() {
         </p>
       </div>
 
-      {/* Growth Funnel & Bottleneck Diagnostics Component */}
+      {/* Growth Funnel & Bottleneck Diagnostics */}
       <GrowthFunnel stages={funnelStages} clientName={currentClientObj?.name || 'Client'} />
 
       {/* Metric Cards Grid */}
