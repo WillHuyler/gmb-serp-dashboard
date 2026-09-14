@@ -1,12 +1,15 @@
 "use client";
+
 import React, { useState, useEffect } from 'react';
 import { createClient } from '@supabase/supabase-js';
 import { useSearchParams, useRouter, usePathname } from 'next/navigation';
-import { Sparkles, Lock, RefreshCw, Printer } from 'lucide-react';
-import { MarketingTimeline } from '../../components/timeline/MarketingTimeline';
-import { DemoControls } from '../../components/demo/DemoControls';
-import { MetricRegistry, CanonicalMetricResult } from '../../lib/metrics/registry';
-import { DataCertificationBadge, CertificationStatus } from '../../components/trust/DataCertificationBadge';
+import { Sparkles, Lock, RefreshCw, Printer, Target } from 'lucide-react';
+
+import { MarketingTimeline } from '@/components/timeline/MarketingTimeline';
+import { DemoControls } from '@/components/demo/DemoControls';
+import { MetricRegistry, CanonicalMetricResult, TargetPacingResult } from '@/lib/metrics/registry';
+import { DataCertificationBadge, CertificationStatus } from '@/components/trust/DataCertificationBadge';
+import { GrowthFunnel, FunnelStageData } from '@/components/analytics/GrowthFunnel';
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL || '',
@@ -23,6 +26,14 @@ export default function CommandCenterPage() {
   const [keywords, setKeywords] = useState<any[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [demoAnomaly, setDemoAnomaly] = useState<string>('baseline');
+
+  const funnelStages: FunnelStageData[] = [
+    { stageName: 'Impressions', count: 485000, conversionRate: 100, benchmarkRate: 100 },
+    { stageName: 'Clicks', count: 12400, conversionRate: 2.55, benchmarkRate: 2.80 },
+    { stageName: 'Leads', count: 620, conversionRate: 5.00, benchmarkRate: 6.20 },
+    { stageName: 'Qualified', count: 184, conversionRate: 29.67, benchmarkRate: 40.00 },
+    { stageName: 'Closed Sales', count: 42, conversionRate: 22.82, benchmarkRate: 25.00 },
+  ];
 
   useEffect(() => {
     async function loadClients() {
@@ -88,16 +99,20 @@ export default function CommandCenterPage() {
     displayedVisibility = Math.max(0, displayedVisibility - 28);
   }
 
+  const leadsPacing: TargetPacingResult = MetricRegistry.calculateTargetPacing(184, 225);
+
   const certStatus: CertificationStatus = currentClientObj?.data_certification_status || 
     (visibilityMetric.healthStatus === 'VALID' ? 'DATA_CERTIFIED' : 'DATA_REVIEW_REQUIRED');
 
   return (
     <div className="p-8 max-w-[1600px] mx-auto space-y-8 font-sans print:p-0 print:bg-white">
       
+      {/* Demo Scenario Anomaly Control Bar */}
       <div className="print:hidden">
         <DemoControls onTriggerScenario={(scenario) => setDemoAnomaly(scenario)} />
       </div>
 
+      {/* Header, Client Switcher, Target Pacing & Certification Badge */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div className="space-y-1">
           <div className="flex items-center gap-3">
@@ -105,11 +120,21 @@ export default function CommandCenterPage() {
             <DataCertificationBadge status={certStatus} statusMessage={visibilityMetric.statusMessage} />
           </div>
           <p className="text-xs text-[#5E7187]">
-            Unified performance summary for <span className="text-[#FFC44D] font-bold">{currentClientObj?.name || 'Selected Entity'}</span>
+            Unified decision surface for <span className="text-[#FFC44D] font-bold">{currentClientObj?.name || 'Selected Entity'}</span>
           </p>
         </div>
 
         <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2 bg-[#FFFFFF] border border-[#E2E8F0] px-3.5 py-1.5 rounded-xl shadow-sm text-xs font-mono">
+            <Target className="w-4 h-4 text-[#3498DB]" />
+            <div>
+              <span className="text-[9px] text-[#5E7187] block uppercase font-bold">Leads Target Pace</span>
+              <span className={`font-bold ${leadsPacing.status === 'BEHIND' ? 'text-amber-600' : 'text-emerald-600'}`}>
+                184 / 225 ({leadsPacing.pacePercentage}%)
+              </span>
+            </div>
+          </div>
+
           <button
             onClick={handlePrint}
             className="print:hidden bg-[#FFFFFF] border border-[#E2E8F0] hover:bg-[#F4F6F8] text-[#102033] font-bold text-xs px-3.5 py-2 rounded-xl flex items-center gap-2 shadow-sm transition-all"
@@ -135,6 +160,7 @@ export default function CommandCenterPage() {
         </div>
       </div>
 
+      {/* Beacon AI Executive Briefing */}
       <div className="bg-[#08111F] text-white rounded-2xl p-6 border border-[#F5A000]/30 shadow-md relative overflow-hidden print:border-black print:bg-white print:text-black">
         <div className="flex items-center gap-2 mb-3">
           <div className="p-1.5 bg-[#0E192B] border border-[#F5A000]/40 rounded-lg">
@@ -158,10 +184,14 @@ export default function CommandCenterPage() {
             ? 'Add search terms with assigned target Zip Codes in OtterWatch SERP to calculate real-time visibility scores.'
             : demoAnomaly === 'rank_drop'
             ? 'Recent local pack shift displaced primary category terms into position #6+. Immediate GBP secondary listing update recommended.'
-            : `Live telemetry from Supabase verified across ${activeKeywords.length} terms for ${currentClientObj?.name || 'Client'}. Data certified against provider account mapped entities.`}
+            : `Currently pacing at ${leadsPacing.pacePercentage}% toward monthly target of 225 qualified leads. Primary bottleneck identified at Lead -> Qualified stage.`}
         </p>
       </div>
 
+      {/* Growth Funnel & Bottleneck Diagnostics Component */}
+      <GrowthFunnel stages={funnelStages} clientName={currentClientObj?.name || 'Client'} />
+
+      {/* Metric Cards Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         <div className="bg-[#FFFFFF] border border-[#E2E8F0] rounded-xl p-5 shadow-sm space-y-4">
           <div className="flex justify-between items-center">
