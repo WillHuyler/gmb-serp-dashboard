@@ -88,15 +88,19 @@ export class DecisionEngine {
   }
 
   /**
-   * Evaluates predictive outcomes for Outcome Lab scenarios.
+   * Models forward scenario for Outcome Lab page.
    */
-  static evaluateOutcomeScenario(scenarioName: string): PredictionOutcome {
+  static modelForwardScenario(
+    baselineVisibility: number,
+    multiplier: number,
+    integrationType: string
+  ): PredictionOutcome {
     return {
       id: `pred_${Date.now()}`,
-      scenario: scenarioName,
-      predictedImpact: '+18% Local Visibility Recovery within 14 Days',
+      scenario: integrationType,
+      predictedImpact: `+${(baselineVisibility * 0.15 * multiplier).toFixed(1)}% Local Visibility Recovery`,
       confidenceScore: 0.92,
-      recommendedBudgetShift: 'Reallocate $1,200/mo from Non-Performing Keywords to GBP Local Ads',
+      recommendedBudgetShift: 'Reallocate non-performing paid search budget to high-intent GBP Local Ads',
       projectedRankChange: -2.4,
     };
   }
