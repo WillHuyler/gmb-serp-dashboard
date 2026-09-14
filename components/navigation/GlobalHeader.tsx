@@ -16,7 +16,6 @@ export function GlobalHeader() {
       </div>
 
       <div className="flex items-center space-x-4">
-        {/* DYNAMIC MULTI-TENANT CLIENT SELECTOR */}
         <div className="flex items-center space-x-2 bg-[#111622] border border-[#A9C7E5]/20 rounded-md px-3 py-1.5">
           <span className="text-xs text-slate-400 font-mono">Select Pitch Prospect:</span>
           {isLoading ? (
@@ -28,8 +27,7 @@ export function GlobalHeader() {
                 const target = clients.find((c) => c.id === e.target.value);
                 if (target) {
                   setActiveClient(target);
-                  // Update URL query string to trigger server-side re-validation
-                  window.location.href = `?clientId=${target.id}`;
+                  window.location.search = `?clientId=${target.id}`;
                 }
               }}
               className="bg-transparent text-xs font-mono text-amber-400 focus:outline-none cursor-pointer"
