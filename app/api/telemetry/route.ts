@@ -1,4 +1,4 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 
 const supabase = createClient(
@@ -6,51 +6,80 @@ const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ''
 );
 
-export async function POST(request: Request) {
+export async function POST(req: NextRequest) {
   try {
-    const body = await request.json();
-    const { tenant_id, client_id, keyword_id, serp_rank, previous_rank } = body;
+    const body = await req.json();
+    const { tenant_id, client_id } = body;
 
-    if (!tenant_id || !client_id || !keyword_id || serp_rank === undefined) {
-      return NextResponse.json(
-        { error: 'Missing required fields: tenant_id, client_id, keyword_id, serp_rank' },
-        { status: 400 }
+    if (!tenant_id || !client_id) {
+      return NextResponse.json({ error: 'Missing tenant_id or client_id' }, { status: 400 });
+    }
+
+    // Scan keyword telemetry for rank drops
+    const { data: keywords, error } = await supabase
+      .from('keyword_library')
+      .select(`
+        id,
+        keyword,
+        rank_history (
+          serp_rank,
+          created_at
+        )
+      `)
+      .eq('client_id', client_id);
+
+    if (error) {
+      return NextResponse.json({ error: error.message }, { status: 500 });
+    }
+
+    const interventions: Array<{
+      tenant_id: string;
+      client_id: string;
+      severity: string;
+      signal_type: string;
+      title: string;
+      message: string;
+      recommended_action: string;
+      is_resolved: boolean;
+      created_at: string;
+    }> = [];
+
+    (keywords || []).forEach((kw: any) => {
+      // Sort history descending (newest timestamp first)
+      const history = (kw.rank_history || []).sort(
+        (a: any, b: any) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
       );
-    }
 
-    // 1. Record rank update in rank_history
-    const { error: rankError } = await supabase.from('rank_history').insert([
-      {
-        keyword_id,
-        serp_rank,
-        created_at: new Date().toISOString(),
-      },
-    ]);
+      if (history.length < 2) return;
 
-    if (rankError) {
-      return NextResponse.json({ error: rankError.message }, { status: 500 });
-    }
+      const latestRank = history[0].serp_rank;   // Rank #8 (today)
+      const previousRank = history[1].serp_rank; // Rank #2 (yesterday)
 
-    // 2. Automated Anomaly Detection: Flag displacement out of Local Pack (Position > 3)
-    if (previous_rank && previous_rank <= 3 && serp_rank > 3) {
-      const dropDelta = serp_rank - previous_rank;
-      
-      await supabase.from('signals').insert([
-        {
+      if (previousRank <= 3 && latestRank > 3) {
+        interventions.push({
           tenant_id,
           client_id,
           severity: 'CRITICAL',
-          signal_type: 'LOCAL_PACK_DISPLACEMENT',
-          title: `Local Pack Loss (+${dropDelta} Positions)`,
-          message: `Keyword #${keyword_id} dropped from Position #${previous_rank} to #${serp_rank}, losing Top 3 Local Pack placement.`,
-          recommended_action: 'Audit target GBP categories and check local citation consistency immediately.',
+          signal_type: 'SERP_PACK_DROP',
+          title: `Local Pack Loss: ${kw.keyword}`,
+          message: `Keyword "${kw.keyword}" dropped from position #${previousRank} to #${latestRank}, losing Top 3 Local Pack placement.`,
+          recommended_action: 'Audit primary GBP category assignment and request immediate local citation sync.',
           is_resolved: false,
-        },
-      ]);
+          created_at: new Date().toISOString(),
+        });
+      }
+    });
+
+    if (interventions.length > 0) {
+      await supabase.from('signals').insert(interventions);
     }
 
-    return NextResponse.json({ success: true, processed_at: new Date().toISOString() });
+    return NextResponse.json({
+      success: true,
+      evaluated_count: interventions.length,
+      timestamp: new Date().toISOString(),
+    });
   } catch (err: any) {
-    return NextResponse.json({ error: err.message || 'Internal Server Error' }, { status: 500 });
+    return NextResponse.json({ error: err.message || 'Evaluation engine failure' }, { status: 500 });
   }
 }
