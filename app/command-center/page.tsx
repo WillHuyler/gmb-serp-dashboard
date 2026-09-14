@@ -4,9 +4,7 @@ import React, { useEffect, useState, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { createClient } from '@supabase/supabase-js';
 import { RefreshCw, Download, AlertTriangle, CheckCircle2, ShieldAlert, Activity } from 'lucide-react';
-import { MetricRegistry, CanonicalMetricResult, TargetPacingResult } from '@/lib/metrics/registry';
-import GrowthFunnel from '@/components/analytics/GrowthFunnel';
-import MarketingTimeline from '@/components/timeline/MarketingTimeline';
+import { MetricRegistry, CanonicalMetricResult, TargetPacingResult } from '../../lib/metrics/registry';
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL || '',
@@ -63,8 +61,6 @@ function CommandCenterContent() {
       }
 
       setClients(clientsData);
-
-      // Select client from URL or default to first certified entity
       const active = clientsData.find((c) => c.id === clientIdFromUrl) || clientsData[0];
       setSelectedClient(active);
     }
@@ -79,7 +75,6 @@ function CommandCenterContent() {
     async function fetchTelemetryData() {
       setIsLoading(true);
 
-      // Fetch active keywords with latest rank history
       const { data: keywordData } = await supabase
         .from('keyword_library')
         .select(`
@@ -97,7 +92,7 @@ function CommandCenterContent() {
       const fetchedKeywords = (keywordData as unknown as KeywordRecord[]) || [];
       setKeywords(fetchedKeywords);
 
-      // Calculate Zero-Mock Local Visibility Score via Canonical Metric Registry v2
+      // Calculate Zero-Mock Local Visibility Score via MetricRegistry v2
       const visResult = MetricRegistry.calculateLocalVisibility(
         selectedClient.tenant_id,
         selectedClient.id,
@@ -105,11 +100,11 @@ function CommandCenterContent() {
       );
       setVisibilityMetric(visResult);
 
-      // Calculate Target Pacing against Nominal Baseline (80% Top 3 Target)
+      // Calculate Target Pacing against Nominal Baseline
       const targetPace = MetricRegistry.calculateTargetPacing(visResult.value, 80);
       setPacingResult(targetPace);
 
-      // Fetch Active Signals & Anomaly Alerts
+      // Fetch Active Signals
       const { data: signalData } = await supabase
         .from('signals')
         .select('*')
@@ -123,7 +118,7 @@ function CommandCenterContent() {
 
     fetchTelemetryData();
 
-    // 3. Realtime Signal Listener (Supabase WebSocket Channel)
+    // Realtime Signal Listener
     const channel = supabase
       .channel(`realtime:signals:${selectedClient.id}`)
       .on(
@@ -185,7 +180,6 @@ function CommandCenterContent() {
         </div>
 
         <div className="flex flex-wrap items-center gap-3 print:hidden">
-          {/* Target Pacing Indicator */}
           <div className="flex items-center rounded-lg border border-[#1E293B] bg-[#0F172A] px-3 py-1.5 text-xs text-white">
             <Activity className="mr-2 h-4 w-4 text-[#0066FF]" />
             <span className="text-[#94A3B8]">VISIBILITY PACE:</span>
@@ -194,7 +188,6 @@ function CommandCenterContent() {
             </span>
           </div>
 
-          {/* Export PDF Button */}
           <button
             onClick={handleExportPDF}
             className="flex items-center rounded-lg border border-[#1E293B] bg-[#0F172A] px-4 py-2 text-xs font-medium text-white transition hover:bg-[#1E293B]"
@@ -202,7 +195,6 @@ function CommandCenterContent() {
             <Download className="mr-2 h-3.5 w-3.5 text-[#F5A000]" /> Export Briefing PDF
           </button>
 
-          {/* Entity Selector */}
           <select
             value={selectedClient?.id || ''}
             onChange={(e) => {
@@ -274,15 +266,16 @@ function CommandCenterContent() {
             <p className="text-xs text-[#64748B]">Stage-by-stage conversion analysis against cohort benchmarks.</p>
           </div>
         </div>
-        <GrowthFunnel 
-          clientName={selectedClient?.name || 'Entity'} 
-          stages={[]} 
-        />
+        <div className="flex items-center justify-center rounded-lg border border-dashed border-slate-300 p-8 text-center">
+          <div>
+            <p className="text-xs font-semibold text-amber-600 uppercase tracking-wider">DATA REVIEW REQUIRED</p>
+            <p className="mt-1 text-sm text-slate-600">Cross-channel funnel pipeline pending certified Google/Meta/CRM stream connections.</p>
+          </div>
+        </div>
       </div>
 
       {/* INTEGRATIONS GRID */}
       <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-4">
-        {/* OtterWatch SERP Card */}
         <div className="rounded-xl border border-[#E2E8F0] bg-white p-5 shadow-sm">
           <div className="flex items-center justify-between">
             <span className="text-xs font-bold uppercase text-[#64748B]">OtterWatch SERP</span>
@@ -300,7 +293,6 @@ function CommandCenterContent() {
           </div>
         </div>
 
-        {/* AI Presence Card */}
         <div className="rounded-xl border border-[#E2E8F0] bg-white p-5 shadow-sm">
           <div className="flex items-center justify-between">
             <span className="text-xs font-bold uppercase text-[#64748B]">AI Presence</span>
@@ -314,7 +306,6 @@ function CommandCenterContent() {
           </div>
         </div>
 
-        {/* Paid Media Card */}
         <div className="rounded-xl border border-[#E2E8F0] bg-white p-5 shadow-sm">
           <div className="flex items-center justify-between">
             <span className="text-xs font-bold uppercase text-[#64748B]">Paid Media</span>
@@ -328,7 +319,6 @@ function CommandCenterContent() {
           </div>
         </div>
 
-        {/* CRM Pipeline Card */}
         <div className="rounded-xl border border-[#E2E8F0] bg-white p-5 shadow-sm">
           <div className="flex items-center justify-between">
             <span className="text-xs font-bold uppercase text-[#64748B]">CRM Pipeline</span>
@@ -340,15 +330,6 @@ function CommandCenterContent() {
             <div className="text-2xl font-bold text-[#94A3B8]">--</div>
             <div className="mt-1 text-xs text-[#94A3B8]">HubSpot/Salesforce Unlinked</div>
           </div>
-        </div>
-      </div>
-
-      {/* TIMELINE OVERLAY */}
-      <div className="rounded-xl border border-[#1E293B] bg-[#0F172A] p-6 text-white">
-        <h3 className="text-base font-bold">Unified Marketing Event Timeline</h3>
-        <p className="text-xs text-[#94A3B8]">Correlate budget changes, ranking movements, and deployment events.</p>
-        <div className="mt-4">
-          <MarketingTimeline />
         </div>
       </div>
     </div>
