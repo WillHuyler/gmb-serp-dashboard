@@ -5,6 +5,7 @@ import { useClient } from '../../lib/client-context';
 
 export default function OutcomeLabPage() {
   const { activeClient } = useClient();
+  const [simulationMode, setSimulationMode] = useState<'REVERSE' | 'FORWARD'>('REVERSE');
   const [currentLeads, setCurrentLeads] = useState<number>(180);
   const [targetLeads, setTargetLeads] = useState<number>(250);
   const [timeframe, setTimeframe] = useState<number>(30);
@@ -50,12 +51,36 @@ export default function OutcomeLabPage() {
             Simulate forward scenarios or reverse-optimize targets with statistical bounds.
           </p>
         </div>
+
+        {/* OPTIMIZATION MODE SELECTOR */}
+        <div className="flex bg-[#111622] border border-[#A9C7E5]/20 rounded-lg p-1 space-x-1 font-mono text-xs">
+          <button
+            onClick={() => setSimulationMode('REVERSE')}
+            className={`px-4 py-1.5 rounded transition-all ${
+              simulationMode === 'REVERSE'
+                ? 'bg-amber-500 text-black font-bold'
+                : 'text-slate-400 hover:text-white'
+            }`}
+          >
+            ⚡ REVERSE LEAD OPTIMIZATION
+          </button>
+          <button
+            onClick={() => setSimulationMode('FORWARD')}
+            className={`px-4 py-1.5 rounded transition-all ${
+              simulationMode === 'FORWARD'
+                ? 'bg-amber-500 text-black font-bold'
+                : 'text-slate-400 hover:text-white'
+            }`}
+          >
+            📈 FORWARD SCENARIO
+          </button>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         <div className="bg-[#111622] border border-[#A9C7E5]/10 rounded-xl p-6 space-y-6">
           <h2 className="text-xs font-mono uppercase text-slate-400 tracking-wider">
-            DESIRED TARGET OUTCOME
+            {simulationMode === 'REVERSE' ? 'DESIRED TARGET OUTCOME' : 'FORWARD SIMULATION INPUTS'}
           </h2>
 
           <div className="space-y-2">
@@ -69,7 +94,9 @@ export default function OutcomeLabPage() {
           </div>
 
           <div className="space-y-2">
-            <label className="text-xs font-mono text-slate-300">TARGET LEAD GOAL</label>
+            <label className="text-xs font-mono text-slate-300">
+              {simulationMode === 'REVERSE' ? 'TARGET LEAD GOAL' : 'PROJECTED LEAD GAIN'}
+            </label>
             <input
               type="number"
               value={targetLeads}
@@ -97,7 +124,9 @@ export default function OutcomeLabPage() {
 
         <div className="lg:col-span-2 space-y-6">
           <h2 className="text-xs font-mono uppercase text-slate-400 tracking-wider">
-            RECOMMENDED STRATEGIC PATHWAYS
+            {simulationMode === 'REVERSE'
+              ? 'REVERSE DECISION TREE & RECOMMENDED PATHWAYS'
+              : 'FORWARD DECISION PROJECTIONS'}
           </h2>
 
           <div className="bg-[#111622] border border-[#A9C7E5]/10 rounded-xl p-6 space-y-4">
