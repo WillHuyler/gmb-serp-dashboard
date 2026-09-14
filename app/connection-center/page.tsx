@@ -39,33 +39,37 @@ export default function ConnectionCenterPage() {
   }, []);
 
   const handleMapAccount = async (account: ExternalAccount) => {
-    if (!activeClient) {
-      alert('Please select an active client from the top header first.');
+    const params = new URLSearchParams(window.location.search);
+    const targetClientId = activeClient?.id || params.get('clientId');
+
+    if (!targetClientId) {
+      alert('Please select a client from the header dropdown first.');
       return;
     }
 
     setMappingId(account.id);
+
     try {
       const res = await fetch('/api/data/mappings', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          client_id: activeClient.id,
-          external_account_id: account.external_account_id,
+          client_id: targetClientId,
+          external_account_id: account.id, // Sends DB UUID primary key
           provider: account.provider,
         }),
       });
 
       const data = await res.json();
       if (data.success) {
-        alert(`Successfully mapped ${account.descriptive_name} to ${activeClient.name}! Client status updated to Certified.`);
+        alert(`Successfully mapped ${account.descriptive_name}! Status set to Certified.`);
         window.location.reload();
       } else {
         alert(`Mapping failed: ${data.error}`);
       }
     } catch (err) {
       console.error('Error mapping account:', err);
-      alert('An error occurred while linking the account.');
+      alert('Error linking account to client.');
     } finally {
       setMappingId(null);
     }
@@ -112,7 +116,7 @@ export default function ConnectionCenterPage() {
           </div>
         ) : accounts.length === 0 ? (
           <div className="p-8 text-center border border-dashed border-[#A9C7E5]/20 rounded-lg text-xs font-mono text-slate-500">
-            No external provider accounts discovered. Execute the SQL seed script in Supabase or connect a provider above.
+            No external provider accounts discovered.
           </div>
         ) : (
           <div className="overflow-x-auto">
@@ -151,7 +155,7 @@ export default function ConnectionCenterPage() {
                       <button
                         onClick={() => handleMapAccount(acc)}
                         disabled={mappingId === acc.id}
-                        className="bg-amber-500/10 border border-amber-500/30 text-amber-400 text-[11px] font-mono font-bold px-3 py-1 rounded hover:bg-amber-500/20 transition-all disabled:opacity-50"
+                        className="bg-amber-500/10 border border-amber-500/30 text-amber-400 text-[11px] font-mono font-bold px-3 py-1 rounded hover:bg-amber-500/20 transition-all disabled:opacity-50 cursor-pointer"
                       >
                         {mappingId === acc.id ? 'MAPPING...' : `MAP TO ${activeClient?.name ? activeClient.name.toUpperCase() : 'CLIENT'}`}
                       </button>
