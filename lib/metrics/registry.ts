@@ -23,6 +23,14 @@ export interface CanonicalMetricResult<T> {
   };
 }
 
+export interface TargetPacingResult {
+  currentValue: number;
+  targetValue: number;
+  variance: number;
+  pacePercentage: number;
+  status: 'ON_TRACK' | 'BEHIND' | 'EXCEEDING';
+}
+
 export class MetricRegistry {
   /**
    * Calculates Local Pack Visibility Percentage cleanly.
@@ -75,5 +83,23 @@ export class MetricRegistry {
         calculatedAt,
       },
     };
+  }
+
+  /**
+   * Computes Pacing and Target Variances for Executive KPIs.
+   */
+  static calculateTargetPacing(currentValue: number, targetValue: number): TargetPacingResult {
+    if (targetValue <= 0) {
+      return { currentValue, targetValue, variance: 0, pacePercentage: 100, status: 'ON_TRACK' };
+    }
+
+    const variance = currentValue - targetValue;
+    const pacePercentage = Math.round((currentValue / targetValue) * 100);
+    let status: 'ON_TRACK' | 'BEHIND' | 'EXCEEDING' = 'ON_TRACK';
+
+    if (pacePercentage < 90) status = 'BEHIND';
+    else if (pacePercentage >= 105) status = 'EXCEEDING';
+
+    return { currentValue, targetValue, variance, pacePercentage, status };
   }
 }
