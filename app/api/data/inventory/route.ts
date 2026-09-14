@@ -10,17 +10,7 @@ export async function GET() {
   try {
     const { data: accounts, error } = await supabase
       .from('external_accounts')
-      .select(`
-        id,
-        provider,
-        external_account_id,
-        descriptive_name,
-        account_type,
-        status,
-        currency,
-        timezone,
-        discovered_at
-      `)
+      .select('*')
       .order('descriptive_name', { ascending: true });
 
     if (error) {
