@@ -33,6 +33,7 @@ export interface PredictionOutcome {
   recommendedBudgetShift?: string;
   projectedRankChange?: number;
   assumptions?: PredictionAssumption[];
+  dataSources?: string[];
 }
 
 export class DecisionEngine {
@@ -131,6 +132,7 @@ export class DecisionEngine {
         { label: 'Ad Spend Reallocation Executed within 7 Days', sensitivity: 'MEDIUM' },
         { label: 'Local Citation Consistency > 95%', sensitivity: 'LOW' },
       ],
+      dataSources: ['OtterWatch SERP', 'Google Ads Telemetry', 'GBP Local Insights'],
     };
   }
 
@@ -161,6 +163,7 @@ export class DecisionEngine {
           { label: `Channel Efficiency Score (${channel.toUpperCase()})`, sensitivity: 'HIGH' },
           { label: 'Conversion Rate Stability', sensitivity: 'MEDIUM' },
         ],
+        dataSources: [channel.toUpperCase(), 'Supabase Signals Ledger'],
       };
     });
   }
