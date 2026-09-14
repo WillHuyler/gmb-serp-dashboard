@@ -108,4 +108,21 @@ export class DecisionEngine {
       projectedRankChange: -2.4,
     };
   }
+
+  /**
+   * Models reverse optimization pathways for target outcomes.
+   */
+  static modelReverseOptimization(
+    targetConfig: { targetMetric: string; desiredValue: number; currentValue: number; timeframeDays: number },
+    channels: string[]
+  ): PredictionOutcome[] {
+    return channels.map((channel, idx) => ({
+      id: `rev_${channel}_${Date.now()}_${idx}`,
+      scenario: `Target Pathway via ${channel.toUpperCase()}`,
+      predictedImpact: `+${targetConfig.desiredValue - targetConfig.currentValue} ${targetConfig.targetMetric} in ${targetConfig.timeframeDays} days`,
+      confidenceScore: 0.88 - idx * 0.05,
+      recommendedBudgetShift: `Increase ${channel} allocation by 15%`,
+      projectedRankChange: -1.5,
+    }));
+  }
 }
