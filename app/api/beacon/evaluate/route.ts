@@ -10,10 +10,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Missing tenant_id or client_id' }, { status: 400 });
     }
 
-    // Run anomaly rules against SERP history
     const interventions = await DecisionEngine.evaluateRankAnomalies(tenant_id, client_id);
-
-    // Persist alerts to real-time signals stream
     await DecisionEngine.persistInterventions(interventions);
 
     return NextResponse.json({
