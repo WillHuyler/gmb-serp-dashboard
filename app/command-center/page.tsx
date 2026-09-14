@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, Suspense } from 'react';
 import { createClient } from '@supabase/supabase-js';
 import { useSearchParams, useRouter, usePathname } from 'next/navigation';
 import { Sparkles, Lock, RefreshCw, Printer, Target } from 'lucide-react';
@@ -16,7 +16,7 @@ const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ''
 );
 
-export default function CommandCenterPage() {
+function CommandCenterContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
   const pathname = usePathname();
@@ -257,5 +257,17 @@ export default function CommandCenterPage() {
       <MarketingTimeline />
 
     </div>
+  );
+}
+
+export default function CommandCenterPage() {
+  return (
+    <Suspense fallback={
+      <div className="p-8 max-w-[1600px] mx-auto flex items-center justify-center min-h-[400px]">
+        <RefreshCw className="w-6 h-6 animate-spin text-[#5E7187]" />
+      </div>
+    }>
+      <CommandCenterContent />
+    </Suspense>
   );
 }
