@@ -15,6 +15,11 @@ export interface SignalIntervention {
   recommended_action: string;
 }
 
+export interface PredictionAssumption {
+  label: string;
+  sensitivity: string;
+}
+
 export interface PredictionOutcome {
   id: string;
   scenario: string;
@@ -27,6 +32,7 @@ export interface PredictionOutcome {
   rangeMax?: number | string;
   recommendedBudgetShift?: string;
   projectedRankChange?: number;
+  assumptions?: PredictionAssumption[];
 }
 
 export class DecisionEngine {
@@ -120,6 +126,11 @@ export class DecisionEngine {
       rangeMax: maxBound,
       recommendedBudgetShift: 'Reallocate non-performing paid search budget to high-intent GBP Local Ads',
       projectedRankChange: -2.4,
+      assumptions: [
+        { label: 'GBP Category Alignment Maintained', sensitivity: 'HIGH' },
+        { label: 'Ad Spend Reallocation Executed within 7 Days', sensitivity: 'MEDIUM' },
+        { label: 'Local Citation Consistency > 95%', sensitivity: 'LOW' },
+      ],
     };
   }
 
@@ -146,6 +157,10 @@ export class DecisionEngine {
         rangeMax: maxBound,
         recommendedBudgetShift: `Increase ${channel} allocation by 15%`,
         projectedRankChange: -1.5,
+        assumptions: [
+          { label: `Channel Efficiency Score (${channel.toUpperCase()})`, sensitivity: 'HIGH' },
+          { label: 'Conversion Rate Stability', sensitivity: 'MEDIUM' },
+        ],
       };
     });
   }
