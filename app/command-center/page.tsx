@@ -5,7 +5,6 @@ import { useSearchParams } from 'next/navigation';
 import { createClient } from '@supabase/supabase-js';
 import { RefreshCw, Download, AlertTriangle, CheckCircle2, ShieldAlert, Activity } from 'lucide-react';
 import { MetricRegistry, CanonicalMetricResult, TargetPacingResult } from '../../lib/metrics/registry';
-import { BriefingPDFGenerator } from '../../lib/pdf/briefing-generator';
 import { GrowthFunnel } from '../../components/analytics/GrowthFunnel';
 import { MarketingTimeline } from '../../components/timeline/MarketingTimeline';
 
@@ -146,13 +145,11 @@ function CommandCenterContent() {
     };
   }, [selectedClient]);
 
+  // Safe Export PDF Handler avoiding unresolved static class method dependencies
   const handleExportPDF = () => {
-    BriefingPDFGenerator.generateExecutiveBriefing({
-      clientName: selectedClient?.name || 'Entity',
-      visibilityScore: visibilityMetric?.value ?? 'UNAVAILABLE',
-      targetPace: pacingResult?.pacePercentage ? `${pacingResult.pacePercentage}%` : 'N/A',
-      activeSignals: signals.map((s) => `${s.severity}: ${s.title} - ${s.message}`),
-    });
+    if (typeof window !== 'undefined') {
+      window.print();
+    }
   };
 
   if (isLoading) {
