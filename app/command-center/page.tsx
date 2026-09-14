@@ -145,7 +145,6 @@ function CommandCenterContent() {
     };
   }, [selectedClient]);
 
-  // Safe Export PDF Handler avoiding unresolved static class method dependencies
   const handleExportPDF = () => {
     if (typeof window !== 'undefined') {
       window.print();
@@ -275,7 +274,7 @@ function CommandCenterContent() {
             <p className="text-xs text-[#64748B]">Stage-by-stage conversion analysis against cohort benchmarks.</p>
           </div>
         </div>
-        <GrowthFunnel clientId={selectedClient?.id || ''} />
+        <GrowthFunnel />
       </div>
 
       {/* INTEGRATIONS GRID */}
