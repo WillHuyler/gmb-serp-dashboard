@@ -5,11 +5,11 @@ import { createClient } from '@supabase/supabase-js';
 import { useSearchParams, useRouter, usePathname } from 'next/navigation';
 import { Sparkles, Lock, RefreshCw, Printer, Target } from 'lucide-react';
 
-import { MarketingTimeline } from '../../components/timeline/MarketingTimeline';
-import { DemoControls } from '../../components/demo/DemoControls';
-import { MetricRegistry, CanonicalMetricResult, TargetPacingResult } from '../../lib/metrics/registry';
-import { DataCertificationBadge, CertificationStatus } from '../../components/trust/DataCertificationBadge';
-import { GrowthFunnel, FunnelStageData } from '../../components/analytics/GrowthFunnel';
+import { MarketingTimeline } from '../components/timeline/MarketingTimeline';
+import { DemoControls } from '../components/demo/DemoControls';
+import { MetricRegistry, CanonicalMetricResult, TargetPacingResult } from '../lib/metrics/registry';
+import { DataCertificationBadge, CertificationStatus } from '../components/trust/DataCertificationBadge';
+import { GrowthFunnel, FunnelStageData } from '../components/analytics/GrowthFunnel';
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL || '',
