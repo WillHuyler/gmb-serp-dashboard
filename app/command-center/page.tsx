@@ -4,9 +4,9 @@ import React, { useEffect, useState, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { createClient } from '@supabase/supabase-js';
 import { RefreshCw, Download, AlertTriangle, CheckCircle2, ShieldAlert, Activity } from 'lucide-react';
-import { MetricRegistry, CanonicalMetricResult, TargetPacingResult } from '../../lib/metrics/registry';
-import { GrowthFunnel } from '../../components/analytics/GrowthFunnel';
-import { MarketingTimeline } from '../../components/timeline/MarketingTimeline';
+import { MetricRegistry, CanonicalMetricResult, TargetPacingResult } from '@/lib/metrics/registry';
+import { GrowthFunnel } from '@/components/analytics/GrowthFunnel';
+import { MarketingTimeline } from '@/components/timeline/MarketingTimeline';
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL || '',
@@ -274,7 +274,10 @@ function CommandCenterContent() {
             <p className="text-xs text-[#64748B]">Stage-by-stage conversion analysis against cohort benchmarks.</p>
           </div>
         </div>
-        <GrowthFunnel />
+        <GrowthFunnel 
+          clientName={selectedClient?.name || 'Entity'} 
+          stages={[]} 
+        />
       </div>
 
       {/* INTEGRATIONS GRID */}
