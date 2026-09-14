@@ -21,6 +21,8 @@ export interface PredictionOutcome {
   predictedImpact: string;
   confidenceScore: number;
   evidenceGrade?: string;
+  baselineValue?: number | string;
+  expectedValue?: number | string;
   recommendedBudgetShift?: string;
   projectedRankChange?: number;
 }
@@ -100,12 +102,16 @@ export class DecisionEngine {
       ? baselineVisibility[baselineVisibility.length - 1] || 100
       : baselineVisibility;
 
+    const projected = Number((baseValue * (1 + 0.15 * multiplier)).toFixed(1));
+
     return {
       id: `pred_${Date.now()}`,
       scenario: integrationType,
       predictedImpact: `+${(baseValue * 0.15 * multiplier).toFixed(1)}% Local Visibility Recovery`,
       confidenceScore: 0.92,
       evidenceGrade: 'HIGH_CONFIDENCE_TELEMETRY',
+      baselineValue: baseValue,
+      expectedValue: projected,
       recommendedBudgetShift: 'Reallocate non-performing paid search budget to high-intent GBP Local Ads',
       projectedRankChange: -2.4,
     };
@@ -124,6 +130,8 @@ export class DecisionEngine {
       predictedImpact: `+${targetConfig.desiredValue - targetConfig.currentValue} ${targetConfig.targetMetric} in ${targetConfig.timeframeDays} days`,
       confidenceScore: 0.88 - idx * 0.05,
       evidenceGrade: 'HIGH_CONFIDENCE_TELEMETRY',
+      baselineValue: targetConfig.currentValue,
+      expectedValue: targetConfig.desiredValue,
       recommendedBudgetShift: `Increase ${channel} allocation by 15%`,
       projectedRankChange: -1.5,
     }));
