@@ -28,6 +28,7 @@ export interface PredictionOutcome {
   evidenceGrade?: string;
   baselineValue?: number | string;
   expectedValue?: number | string;
+  expectedLiftPercent?: number | string;
   rangeMin?: number | string;
   rangeMax?: number | string;
   recommendedBudgetShift?: string;
@@ -111,18 +112,20 @@ export class DecisionEngine {
       ? baselineVisibility[baselineVisibility.length - 1] || 100
       : baselineVisibility;
 
-    const projected = Number((baseValue * (1 + 0.15 * multiplier)).toFixed(1));
+    const liftPercent = Number((15 * multiplier).toFixed(1));
+    const projected = Number((baseValue * (1 + liftPercent / 100)).toFixed(1));
     const minBound = Number((projected * 0.92).toFixed(1));
     const maxBound = Number((projected * 1.08).toFixed(1));
 
     return {
       id: `pred_${Date.now()}`,
       scenario: integrationType,
-      predictedImpact: `+${(baseValue * 0.15 * multiplier).toFixed(1)}% Local Visibility Recovery`,
+      predictedImpact: `+${liftPercent}% Local Visibility Recovery`,
       confidenceScore: 0.92,
       evidenceGrade: 'HIGH_CONFIDENCE_TELEMETRY',
       baselineValue: baseValue,
       expectedValue: projected,
+      expectedLiftPercent: liftPercent,
       rangeMin: minBound,
       rangeMax: maxBound,
       recommendedBudgetShift: 'Reallocate non-performing paid search budget to high-intent GBP Local Ads',
@@ -143,6 +146,11 @@ export class DecisionEngine {
     targetConfig: { targetMetric: string; desiredValue: number; currentValue: number; timeframeDays: number },
     channels: string[]
   ): PredictionOutcome[] {
+    const rawLift = targetConfig.currentValue > 0
+      ? ((targetConfig.desiredValue - targetConfig.currentValue) / targetConfig.currentValue) * 100
+      : 0;
+    const liftPercent = Number(rawLift.toFixed(1));
+
     return channels.map((channel, idx) => {
       const minBound = Number((targetConfig.desiredValue * 0.9).toFixed(1));
       const maxBound = Number((targetConfig.desiredValue * 1.1).toFixed(1));
@@ -151,10 +159,11 @@ export class DecisionEngine {
         id: `rev_${channel}_${Date.now()}_${idx}`,
         scenario: `Target Pathway via ${channel.toUpperCase()}`,
         predictedImpact: `+${targetConfig.desiredValue - targetConfig.currentValue} ${targetConfig.targetMetric} in ${targetConfig.timeframeDays} days`,
-        confidenceScore: 0.88 - idx * 0.05,
+        confidenceScore: Number((0.88 - idx * 0.05).toFixed(2)),
         evidenceGrade: 'HIGH_CONFIDENCE_TELEMETRY',
         baselineValue: targetConfig.currentValue,
         expectedValue: targetConfig.desiredValue,
+        expectedLiftPercent: liftPercent,
         rangeMin: minBound,
         rangeMax: maxBound,
         recommendedBudgetShift: `Increase ${channel} allocation by 15%`,
