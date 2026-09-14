@@ -5,8 +5,8 @@ import { useSearchParams } from 'next/navigation';
 import { createClient } from '@supabase/supabase-js';
 import { RefreshCw, Download, AlertTriangle, CheckCircle2, ShieldAlert, Activity } from 'lucide-react';
 import { MetricRegistry, CanonicalMetricResult, TargetPacingResult } from '@/lib/metrics/registry';
-import { GrowthFunnel } from '@/components/analytics/GrowthFunnel';
-import { MarketingTimeline } from '@/components/timeline/MarketingTimeline';
+import GrowthFunnel from '@/components/analytics/GrowthFunnel';
+import MarketingTimeline from '@/components/timeline/MarketingTimeline';
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL || '',
