@@ -7,6 +7,8 @@ export default function OutcomeLabPage() {
   const [currentValue, setCurrentValue] = useState<number>(180);
   const [desiredValue, setDesiredValue] = useState<number>(250);
   const [timeframeDays, setTimeframeDays] = useState<number>(30);
+  const [deployingId, setDeployingId] = useState<string | null>(null);
+  const [deployedSuccess, setDeployedSuccess] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
 
   const channels = ['otterwatch', 'google_ads', 'meta_ads'];
@@ -22,6 +24,35 @@ export default function OutcomeLabPage() {
     targetConfig,
     channels
   );
+
+  const handleDeployPathway = async (strat: PredictionOutcome) => {
+    setDeployingId(strat.id);
+    setDeployedSuccess(null);
+
+    try {
+      const res = await fetch('/api/outcome-lab/deploy', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          tenant_id: '00000000-0000-0000-0000-000000000001',
+          client_id: 'bf93fef0-fc60-4119-8ea2-68a274984355',
+          pathway_title: strat.scenario,
+          expected_lift: strat.expectedLiftPercent,
+          timeframe_days: timeframeDays,
+          target_goal: desiredValue,
+        }),
+      });
+
+      const data = await res.json();
+      if (data.success) {
+        setDeployedSuccess(strat.id);
+      }
+    } catch (err) {
+      console.error('Deployment error:', err);
+    } finally {
+      setDeployingId(null);
+    }
+  };
 
   return (
     <div className="p-8 space-y-8 bg-[#0B0F17] text-white min-h-screen">
@@ -97,7 +128,7 @@ export default function OutcomeLabPage() {
             {pathways.map((strat, i) => (
               <div
                 key={strat.id}
-                className="bg-[#111622] border border-[#A9C7E5]/10 rounded-xl p-5 space-y-3"
+                className="bg-[#111622] border border-[#A9C7E5]/10 rounded-xl p-5 space-y-4"
               >
                 <div className="flex justify-between items-center border-b border-[#A9C7E5]/10 pb-2">
                   <span className="text-xs font-bold text-[#FFC44D] uppercase">
@@ -123,6 +154,24 @@ export default function OutcomeLabPage() {
                   <span>
                     Model Engine: <strong className="text-white">{strat.modelVersion}</strong>
                   </span>
+                </div>
+
+                <div className="pt-1 flex justify-end">
+                  <button
+                    onClick={() => handleDeployPathway(strat)}
+                    disabled={deployingId === strat.id}
+                    className={`px-4 py-2 rounded text-xs font-mono font-bold transition ${
+                      deployedSuccess === strat.id
+                        ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/40'
+                        : 'bg-amber-500 text-black hover:bg-amber-400'
+                    }`}
+                  >
+                    {deployingId === strat.id
+                      ? 'DEPLOYING...'
+                      : deployedSuccess === strat.id
+                      ? '✓ STRATEGY DEPLOYED'
+                      : 'DEPLOY STRATEGY TO COMMAND CENTER'}
+                  </button>
                 </div>
               </div>
             ))}
