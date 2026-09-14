@@ -7,8 +7,12 @@ const supabase = createClient(
 
 export const revalidate = 0;
 
-export default async function CommandCenterPage() {
-  const clientId = 'bf93fef0-fc60-4119-8ea2-68a274984355';
+export default async function CommandCenterPage({
+  searchParams,
+}: {
+  searchParams?: { clientId?: string };
+}) {
+  const clientId = searchParams?.clientId || 'bf93fef0-fc60-4119-8ea2-68a274984355';
 
   // Fetch Signals & Anomalies
   const { data: signals } = await supabase
@@ -33,7 +37,6 @@ export default async function CommandCenterPage() {
 
   const crm = crmData?.[0] || { total_leads: 0, qualified_leads: 0, closed_sales: 0, total_revenue: 0 };
 
-  // Calculate aggregated paid ad spend
   const totalSpend = (paidData || []).reduce((acc, curr) => {
     const amount = typeof curr.spend === 'number' ? curr.spend : parseFloat(curr.spend || '0');
     return acc + (isNaN(amount) ? 0 : amount);
@@ -50,7 +53,6 @@ export default async function CommandCenterPage() {
         </p>
       </div>
 
-      {/* METRICS OVERVIEW GRID */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
         <div className="bg-[#111622] border border-[#A9C7E5]/10 rounded-xl p-5 space-y-2">
           <span className="text-xs font-mono uppercase text-slate-400">TOTAL LEADS (CRM)</span>
@@ -77,7 +79,6 @@ export default async function CommandCenterPage() {
         </div>
       </div>
 
-      {/* SIGNALS & DEPLOYED STRATEGIES LEDGER */}
       <div className="bg-[#111622] border border-[#A9C7E5]/10 rounded-xl p-6 space-y-4">
         <h2 className="text-xs font-mono uppercase text-slate-400 tracking-wider">
           BEACON INTELLIGENCE LEDGER & DEPLOYED TARGETS
