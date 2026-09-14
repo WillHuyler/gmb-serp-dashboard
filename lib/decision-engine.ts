@@ -23,6 +23,8 @@ export interface PredictionOutcome {
   evidenceGrade?: string;
   baselineValue?: number | string;
   expectedValue?: number | string;
+  rangeMin?: number | string;
+  rangeMax?: number | string;
   recommendedBudgetShift?: string;
   projectedRankChange?: number;
 }
@@ -103,6 +105,8 @@ export class DecisionEngine {
       : baselineVisibility;
 
     const projected = Number((baseValue * (1 + 0.15 * multiplier)).toFixed(1));
+    const minBound = Number((projected * 0.92).toFixed(1));
+    const maxBound = Number((projected * 1.08).toFixed(1));
 
     return {
       id: `pred_${Date.now()}`,
@@ -112,6 +116,8 @@ export class DecisionEngine {
       evidenceGrade: 'HIGH_CONFIDENCE_TELEMETRY',
       baselineValue: baseValue,
       expectedValue: projected,
+      rangeMin: minBound,
+      rangeMax: maxBound,
       recommendedBudgetShift: 'Reallocate non-performing paid search budget to high-intent GBP Local Ads',
       projectedRankChange: -2.4,
     };
@@ -124,16 +130,23 @@ export class DecisionEngine {
     targetConfig: { targetMetric: string; desiredValue: number; currentValue: number; timeframeDays: number },
     channels: string[]
   ): PredictionOutcome[] {
-    return channels.map((channel, idx) => ({
-      id: `rev_${channel}_${Date.now()}_${idx}`,
-      scenario: `Target Pathway via ${channel.toUpperCase()}`,
-      predictedImpact: `+${targetConfig.desiredValue - targetConfig.currentValue} ${targetConfig.targetMetric} in ${targetConfig.timeframeDays} days`,
-      confidenceScore: 0.88 - idx * 0.05,
-      evidenceGrade: 'HIGH_CONFIDENCE_TELEMETRY',
-      baselineValue: targetConfig.currentValue,
-      expectedValue: targetConfig.desiredValue,
-      recommendedBudgetShift: `Increase ${channel} allocation by 15%`,
-      projectedRankChange: -1.5,
-    }));
+    return channels.map((channel, idx) => {
+      const minBound = Number((targetConfig.desiredValue * 0.9).toFixed(1));
+      const maxBound = Number((targetConfig.desiredValue * 1.1).toFixed(1));
+
+      return {
+        id: `rev_${channel}_${Date.now()}_${idx}`,
+        scenario: `Target Pathway via ${channel.toUpperCase()}`,
+        predictedImpact: `+${targetConfig.desiredValue - targetConfig.currentValue} ${targetConfig.targetMetric} in ${targetConfig.timeframeDays} days`,
+        confidenceScore: 0.88 - idx * 0.05,
+        evidenceGrade: 'HIGH_CONFIDENCE_TELEMETRY',
+        baselineValue: targetConfig.currentValue,
+        expectedValue: targetConfig.desiredValue,
+        rangeMin: minBound,
+        rangeMax: maxBound,
+        recommendedBudgetShift: `Increase ${channel} allocation by 15%`,
+        projectedRankChange: -1.5,
+      };
+    });
   }
 }
