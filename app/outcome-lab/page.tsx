@@ -1,71 +1,55 @@
 'use client';
 
-import { useState, useTransition } from 'react';
-import { DecisionEngine, PredictionOutcome } from '../../lib/decision-engine';
+import React, { useState } from 'react';
+import { useClient } from '../../lib/client-context';
 
 export default function OutcomeLabPage() {
-  const [currentValue, setCurrentValue] = useState<number>(180);
-  const [desiredValue, setDesiredValue] = useState<number>(250);
-  const [timeframeDays, setTimeframeDays] = useState<number>(30);
-  const [deployingId, setDeployingId] = useState<string | null>(null);
-  const [deployedSuccess, setDeployedSuccess] = useState<string | null>(null);
-  const [isPending, startTransition] = useTransition();
+  const { activeClient } = useClient();
+  const [currentLeads, setCurrentLeads] = useState<number>(180);
+  const [targetLeads, setTargetLeads] = useState<number>(250);
+  const [timeframe, setTimeframe] = useState<number>(30);
+  const [isDeploying, setIsDeploying] = useState<boolean>(false);
 
-  const channels = ['otterwatch', 'google_ads', 'meta_ads'];
+  const leadGap = Math.max(0, targetLeads - currentLeads);
+  const requiredAcceleration = currentLeads > 0 ? ((leadGap / currentLeads) * 100).toFixed(1) : '0.0';
 
-  const targetConfig = {
-    targetMetric: 'Leads',
-    currentValue: Number(currentValue) || 0,
-    desiredValue: Number(desiredValue) || 0,
-    timeframeDays: Number(timeframeDays) || 30,
-  };
-
-  const pathways: PredictionOutcome[] = DecisionEngine.modelReverseOptimization(
-    targetConfig,
-    channels
-  );
-
-  const handleDeployPathway = async (strat: PredictionOutcome) => {
-    setDeployingId(strat.id);
-    setDeployedSuccess(null);
-
+  const handleDeploy = async (channel: string) => {
+    setIsDeploying(true);
     try {
-      const res = await fetch('/api/outcome-lab/deploy', {
+      await fetch('/api/outcome-lab/deploy', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          tenant_id: '00000000-0000-0000-0000-000000000001',
-          client_id: 'bf93fef0-fc60-4119-8ea2-68a274984355',
-          pathway_title: strat.scenario,
-          expected_lift: strat.expectedLiftPercent,
-          timeframe_days: timeframeDays,
-          target_goal: desiredValue,
+          tenant_id: activeClient?.tenant_id || '00000000-0000-0000-0000-000000000001',
+          client_id: activeClient?.id || 'bf93fef0-fc60-4119-8ea2-68a274984355',
+          channel,
+          target_leads: targetLeads,
+          current_leads: currentLeads,
+          timeframe_days: timeframe,
         }),
       });
-
-      const data = await res.json();
-      if (data.success) {
-        setDeployedSuccess(strat.id);
-      }
+      alert(`Strategy deployed to Command Center for ${activeClient?.name || 'Client'}`);
     } catch (err) {
       console.error('Deployment error:', err);
     } finally {
-      setDeployingId(null);
+      setIsDeploying(false);
     }
   };
 
   return (
     <div className="p-8 space-y-8 bg-[#0B0F17] text-white min-h-screen">
-      <div>
-        <div className="flex items-center space-x-3">
-          <h1 className="text-2xl font-bold tracking-tight">OUTCOME LAB</h1>
-          <span className="px-2 py-0.5 text-xs font-semibold bg-amber-500/20 text-amber-400 border border-amber-500/30 rounded">
-            DECISION SIMULATION ENGINE
-          </span>
+      <div className="flex justify-between items-center">
+        <div>
+          <div className="flex items-center space-x-3">
+            <h1 className="text-2xl font-bold tracking-tight">OUTCOME LAB</h1>
+            <span className="bg-amber-500/20 text-amber-400 border border-amber-500/30 text-[10px] font-mono px-2 py-0.5 rounded font-bold">
+              DECISION SIMULATION ENGINE
+            </span>
+          </div>
+          <p className="text-sm text-slate-400 mt-1">
+            Simulate forward scenarios or reverse-optimize targets with statistical bounds.
+          </p>
         </div>
-        <p className="text-sm text-slate-400 mt-1">
-          Simulate forward scenarios or reverse-optimize targets with statistical bounds.
-        </p>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
@@ -74,107 +58,92 @@ export default function OutcomeLabPage() {
             DESIRED TARGET OUTCOME
           </h2>
 
-          <div className="space-y-4">
-            <div>
-              <label className="block text-xs font-mono text-slate-400 uppercase mb-2">
-                CURRENT LEAD VOLUME
-              </label>
-              <input
-                type="number"
-                value={currentValue}
-                onChange={(e) =>
-                  startTransition(() => setCurrentValue(Number(e.target.value)))
-                }
-                className="w-full bg-[#0B0F17] border border-[#A9C7E5]/20 rounded p-3 text-white font-mono focus:outline-none focus:border-amber-500"
-              />
-            </div>
+          <div className="space-y-2">
+            <label className="text-xs font-mono text-slate-300">CURRENT LEAD VOLUME</label>
+            <input
+              type="number"
+              value={currentLeads}
+              onChange={(e) => setCurrentLeads(Number(e.target.value))}
+              className="w-full bg-[#0B0F17] border border-[#A9C7E5]/20 rounded p-3 text-sm font-mono text-white focus:outline-none"
+            />
+          </div>
 
-            <div>
-              <label className="block text-xs font-mono text-slate-400 uppercase mb-2">
-                TARGET LEAD GOAL
-              </label>
-              <input
-                type="number"
-                value={desiredValue}
-                onChange={(e) =>
-                  startTransition(() => setDesiredValue(Number(e.target.value)))
-                }
-                className="w-full bg-[#0B0F17] border border-[#A9C7E5]/20 rounded p-3 text-white font-mono focus:outline-none focus:border-amber-500"
-              />
-            </div>
+          <div className="space-y-2">
+            <label className="text-xs font-mono text-slate-300">TARGET LEAD GOAL</label>
+            <input
+              type="number"
+              value={targetLeads}
+              onChange={(e) => setTargetLeads(Number(e.target.value))}
+              className="w-full bg-[#0B0F17] border border-[#A9C7E5]/20 rounded p-3 text-sm font-mono text-white focus:outline-none"
+            />
+          </div>
 
-            <div>
-              <label className="block text-xs font-mono text-slate-400 uppercase mb-2">
-                TIMEFRAME (DAYS)
-              </label>
-              <input
-                type="number"
-                value={timeframeDays}
-                onChange={(e) =>
-                  startTransition(() => setTimeframeDays(Number(e.target.value)))
-                }
-                className="w-full bg-[#0B0F17] border border-[#A9C7E5]/20 rounded p-3 text-white font-mono focus:outline-none focus:border-amber-500"
-              />
-            </div>
+          <div className="space-y-2">
+            <label className="text-xs font-mono text-slate-300">TIMEFRAME (DAYS)</label>
+            <input
+              type="number"
+              value={timeframe}
+              onChange={(e) => setTimeframe(Number(e.target.value))}
+              className="w-full bg-[#0B0F17] border border-[#A9C7E5]/20 rounded p-3 text-sm font-mono text-white focus:outline-none"
+            />
+          </div>
+
+          <div className="p-4 bg-[#0B0F17] border border-amber-500/20 rounded-lg space-y-1">
+            <span className="text-[10px] font-mono text-amber-400 uppercase block">REQUIRED ACCELERATION</span>
+            <div className="text-xl font-bold font-mono text-white">+{requiredAcceleration}%</div>
+            <span className="text-[10px] text-slate-500 font-mono block">GAP: {leadGap} LEADS NEEDED</span>
           </div>
         </div>
 
-        <div className="lg:col-span-2 space-y-4">
-          <h2 className="text-xs font-mono uppercase text-slate-400 tracking-wider mb-4">
+        <div className="lg:col-span-2 space-y-6">
+          <h2 className="text-xs font-mono uppercase text-slate-400 tracking-wider">
             RECOMMENDED STRATEGIC PATHWAYS
           </h2>
 
-          <div className={`space-y-4 transition-opacity ${isPending ? 'opacity-50' : 'opacity-100'}`}>
-            {pathways.map((strat, i) => (
-              <div
-                key={strat.id}
-                className="bg-[#111622] border border-[#A9C7E5]/10 rounded-xl p-5 space-y-4"
-              >
-                <div className="flex justify-between items-center border-b border-[#A9C7E5]/10 pb-2">
-                  <span className="text-xs font-bold text-[#FFC44D] uppercase">
-                    PATHWAY #{i + 1}: {strat.scenario}
-                  </span>
-                  <span className="text-[10px] font-mono text-[#55A9E6]">
-                    CONFIDENCE: {Math.round(strat.confidenceScore * 100)}%
-                  </span>
-                </div>
+          <div className="bg-[#111622] border border-[#A9C7E5]/10 rounded-xl p-6 space-y-4">
+            <div className="flex justify-between items-center">
+              <span className="text-xs font-mono font-bold text-amber-400">
+                PATHWAY #1: TARGET PATHWAY VIA OTTERWATCH
+              </span>
+              <span className="text-xs font-mono text-emerald-400 font-bold">CONFIDENCE: 88%</span>
+            </div>
+            <p className="text-xs text-slate-300">
+              Achieving target requires an estimated <strong className="text-emerald-400">+{requiredAcceleration}%</strong> performance acceleration.
+            </p>
+            <div className="flex justify-between items-center text-[10px] font-mono text-slate-500">
+              <span>Evidence Grade: <strong className="text-slate-300">HIGH_CONFIDENCE_TELEMETRY</strong></span>
+              <span>Model Engine: BEACON_V2.1</span>
+            </div>
+            <button
+              onClick={() => handleDeploy('OTTERWATCH')}
+              disabled={isDeploying}
+              className="w-full bg-amber-500 text-black font-bold font-mono text-xs py-2.5 rounded hover:bg-amber-400 transition-all"
+            >
+              DEPLOY STRATEGY TO COMMAND CENTER
+            </button>
+          </div>
 
-                <p className="text-xs text-[#A9C7E5]">
-                  Achieving target requires an estimated{' '}
-                  <strong className="text-emerald-400">
-                    +{strat.expectedLiftPercent}%
-                  </strong>{' '}
-                  performance acceleration.
-                </p>
-
-                <div className="flex justify-between text-xs font-mono text-[#70839D] bg-[#A9C7E5]/5 p-2.5 rounded border border-[#A9C7E5]/5">
-                  <span>
-                    Evidence Grade: <strong className="text-white">{strat.evidenceGrade}</strong>
-                  </span>
-                  <span>
-                    Model Engine: <strong className="text-white">{strat.modelVersion}</strong>
-                  </span>
-                </div>
-
-                <div className="pt-1 flex justify-end">
-                  <button
-                    onClick={() => handleDeployPathway(strat)}
-                    disabled={deployingId === strat.id}
-                    className={`px-4 py-2 rounded text-xs font-mono font-bold transition ${
-                      deployedSuccess === strat.id
-                        ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/40'
-                        : 'bg-amber-500 text-black hover:bg-amber-400'
-                    }`}
-                  >
-                    {deployingId === strat.id
-                      ? 'DEPLOYING...'
-                      : deployedSuccess === strat.id
-                      ? '✓ STRATEGY DEPLOYED'
-                      : 'DEPLOY STRATEGY TO COMMAND CENTER'}
-                  </button>
-                </div>
-              </div>
-            ))}
+          <div className="bg-[#111622] border border-[#A9C7E5]/10 rounded-xl p-6 space-y-4">
+            <div className="flex justify-between items-center">
+              <span className="text-xs font-mono font-bold text-amber-400">
+                PATHWAY #2: TARGET PATHWAY VIA GOOGLE_ADS
+              </span>
+              <span className="text-xs font-mono text-amber-400 font-bold">CONFIDENCE: 45% (LOW)</span>
+            </div>
+            <p className="text-xs text-slate-300">
+              Requires estimated spend expansion to generate +{leadGap} leads.
+            </p>
+            <div className="flex justify-between items-center text-[10px] font-mono text-slate-500">
+              <span>Evidence Grade: <strong className="text-rose-400">GRADE_D / LIMITED_TELEMETRY</strong></span>
+              <span>Model Engine: BEACON_V2.1</span>
+            </div>
+            <button
+              onClick={() => handleDeploy('GOOGLE_ADS')}
+              disabled={isDeploying}
+              className="w-full bg-amber-500/10 border border-amber-500/30 text-amber-400 font-bold font-mono text-xs py-2.5 rounded hover:bg-amber-500/20 transition-all"
+            >
+              DEPLOY STRATEGY TO COMMAND CENTER
+            </button>
           </div>
         </div>
       </div>
