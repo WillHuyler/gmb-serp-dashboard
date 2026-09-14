@@ -32,7 +32,13 @@ export default async function CommandCenterPage() {
     .eq('client_id', clientId);
 
   const crm = crmData?.[0] || { total_leads: 0, qualified_leads: 0, closed_sales: 0, total_revenue: 0 };
-  const totalSpend = (paidData || []).reduce((acc, curr) => acc + Number(curr.spend || 0), 0);
+
+  // Calculate aggregated paid ad spend
+  const totalSpend = (paidData || []).reduce((acc, curr) => {
+    const amount = typeof curr.spend === 'number' ? curr.spend : parseFloat(curr.spend || '0');
+    return acc + (isNaN(amount) ? 0 : amount);
+  }, 0);
+
   const costPerLead = crm.total_leads > 0 ? (totalSpend / crm.total_leads).toFixed(2) : '0.00';
 
   return (
@@ -60,7 +66,7 @@ export default async function CommandCenterPage() {
 
         <div className="bg-[#111622] border border-[#A9C7E5]/10 rounded-xl p-5 space-y-2">
           <span className="text-xs font-mono uppercase text-slate-400">TOTAL AD SPEND</span>
-          <div className="text-2xl font-bold text-amber-400 font-mono">${totalSpend.toLocaleString()}</div>
+          <div className="text-2xl font-bold text-amber-400 font-mono">${totalSpend.toFixed(2)}</div>
           <span className="text-[10px] text-slate-400 font-mono">META + GOOGLE ADS</span>
         </div>
 
