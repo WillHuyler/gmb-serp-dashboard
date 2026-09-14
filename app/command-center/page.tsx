@@ -10,6 +10,7 @@ import { DemoControls } from '../../components/demo/DemoControls';
 import { MetricRegistry, CanonicalMetricResult, TargetPacingResult } from '../../lib/metrics/registry';
 import { DataCertificationBadge, CertificationStatus } from '../../components/trust/DataCertificationBadge';
 import { GrowthFunnel, FunnelStageData } from '../../components/analytics/GrowthFunnel';
+import { BriefingPDFGenerator } from '../../lib/pdf/briefing-generator';
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL || '',
@@ -58,6 +59,27 @@ function CommandCenterContent() {
     if (selectedClient) {
       loadClientTelemetry();
       loadClientSignals();
+
+      // Realtime listener for public.signals table
+      const channel = supabase
+        .channel(`signals:${selectedClient}`)
+        .on(
+          'postgres_changes',
+          {
+            event: 'INSERT',
+            schema: 'public',
+            table: 'signals',
+            filter: `client_id=eq.${selectedClient}`,
+          },
+          (payload) => {
+            setSignals((prev) => [payload.new, ...prev]);
+          }
+        )
+        .subscribe();
+
+      return () => {
+        supabase.removeChannel(channel);
+      };
     }
   }, [selectedClient]);
 
@@ -91,7 +113,11 @@ function CommandCenterContent() {
   };
 
   const handlePrint = () => {
-    window.print();
+    BriefingPDFGenerator.exportToPDF({
+      clientName: currentClientObj?.name || 'Client',
+      generatedAt: new Date().toISOString(),
+      certifiedStatus: certStatus,
+    });
   };
 
   const currentClientObj = clients.find((c) => c.id === selectedClient);
