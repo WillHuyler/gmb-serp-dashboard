@@ -26,6 +26,7 @@ export interface PredictionOutcome {
   predictedImpact: string;
   confidenceScore: number;
   evidenceGrade?: string;
+  modelVersion?: string;
   baselineValue?: number | string;
   expectedValue?: number | string;
   expectedLiftPercent?: number | string;
@@ -123,6 +124,7 @@ export class DecisionEngine {
       predictedImpact: `+${liftPercent}% Local Visibility Recovery`,
       confidenceScore: 0.92,
       evidenceGrade: 'HIGH_CONFIDENCE_TELEMETRY',
+      modelVersion: 'BEACON_V2.1',
       baselineValue: baseValue,
       expectedValue: projected,
       expectedLiftPercent: liftPercent,
@@ -161,6 +163,7 @@ export class DecisionEngine {
         predictedImpact: `+${targetConfig.desiredValue - targetConfig.currentValue} ${targetConfig.targetMetric} in ${targetConfig.timeframeDays} days`,
         confidenceScore: Number((0.88 - idx * 0.05).toFixed(2)),
         evidenceGrade: 'HIGH_CONFIDENCE_TELEMETRY',
+        modelVersion: 'BEACON_V2.1',
         baselineValue: targetConfig.currentValue,
         expectedValue: targetConfig.desiredValue,
         expectedLiftPercent: liftPercent,
