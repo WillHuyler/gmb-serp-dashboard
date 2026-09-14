@@ -1,7 +1,7 @@
 'use client';
 
 import React from 'react';
-import { useClient } from '@/lib/client-context';
+import { useClient } from '../../lib/client-context';
 
 export function GlobalHeader() {
   const { activeClient, clients, setActiveClient, isLoading } = useClient();
