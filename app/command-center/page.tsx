@@ -3,11 +3,11 @@
 import React, { useEffect, useState, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { createClient } from '@supabase/supabase-js';
-import { RefreshCw, Download, AlertTriangle, CheckCircle2, ShieldAlert, BarChart3, Activity } from 'lucide-react';
-import { MetricRegistry, CanonicalMetricResult, TargetPacingResult } from '@/lib/metrics/registry';
-import { BriefingPDFGenerator } from '@/lib/pdf/briefing-generator';
-import { GrowthFunnel } from '@/components/analytics/GrowthFunnel';
-import { MarketingTimeline } from '@/components/timeline/MarketingTimeline';
+import { RefreshCw, Download, AlertTriangle, CheckCircle2, ShieldAlert, Activity } from 'lucide-react';
+import { MetricRegistry, CanonicalMetricResult, TargetPacingResult } from '../../lib/metrics/registry';
+import { BriefingPDFGenerator } from '../../lib/pdf/briefing-generator';
+import { GrowthFunnel } from '../../components/analytics/GrowthFunnel';
+import { MarketingTimeline } from '../../components/timeline/MarketingTimeline';
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL || '',
@@ -106,7 +106,7 @@ function CommandCenterContent() {
       );
       setVisibilityMetric(visResult);
 
-      // Calculate Target Pacing against Nominal Baseline (100% Top 3 Target)
+      // Calculate Target Pacing against Nominal Baseline (80% Top 3 Target)
       const targetPace = MetricRegistry.calculateTargetPacing(visResult.value, 80);
       setPacingResult(targetPace);
 
@@ -224,7 +224,7 @@ function CommandCenterContent() {
         </div>
       </div>
 
-      {/* BEACON EXECUTIVE BRIEFING & REASONING CARD */}
+      {/* BEACON EXECUTIVE BRIEFING CARD */}
       <div className="rounded-xl border border-[#F5A000]/30 bg-[#08111F] p-6 shadow-md print:border-black print:bg-white print:text-black">
         <div className="flex items-center space-x-2 text-xs font-bold uppercase tracking-wider text-[#F5A000]">
           <ShieldAlert className="h-4 w-4" />
@@ -270,7 +270,7 @@ function CommandCenterContent() {
         </div>
       </div>
 
-      {/* GROWTH FUNNEL DIAGNOSTICS (ZERO-MOCK RULE APPLIED) */}
+      {/* GROWTH FUNNEL DIAGNOSTICS */}
       <div className="rounded-xl border border-[#1E293B] bg-white p-6 shadow-sm print:border-black">
         <div className="flex items-center justify-between pb-4">
           <div>
@@ -278,11 +278,10 @@ function CommandCenterContent() {
             <p className="text-xs text-[#64748B]">Stage-by-stage conversion analysis against cohort benchmarks.</p>
           </div>
         </div>
-        {/* Strictly rendering certified data or unintegrated states */}
         <GrowthFunnel clientId={selectedClient?.id || ''} />
       </div>
 
-      {/* INTEGRATIONS & PROVIDER INTELLIGENCE GRID */}
+      {/* INTEGRATIONS GRID */}
       <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-4">
         {/* OtterWatch SERP Card */}
         <div className="rounded-xl border border-[#E2E8F0] bg-white p-5 shadow-sm">
@@ -316,7 +315,7 @@ function CommandCenterContent() {
           </div>
         </div>
 
-        {/* Paid Media (Google/Meta Ads) Card */}
+        {/* Paid Media Card */}
         <div className="rounded-xl border border-[#E2E8F0] bg-white p-5 shadow-sm">
           <div className="flex items-center justify-between">
             <span className="text-xs font-bold uppercase text-[#64748B]">Paid Media</span>
@@ -345,7 +344,7 @@ function CommandCenterContent() {
         </div>
       </div>
 
-      {/* EVENT TIMELINE OVERLAY */}
+      {/* TIMELINE OVERLAY */}
       <div className="rounded-xl border border-[#1E293B] bg-[#0F172A] p-6 text-white">
         <h3 className="text-base font-bold">Unified Marketing Event Timeline</h3>
         <p className="text-xs text-[#94A3B8]">Correlate budget changes, ranking movements, and deployment events.</p>
