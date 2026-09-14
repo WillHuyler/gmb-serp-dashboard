@@ -91,14 +91,18 @@ export class DecisionEngine {
    * Models forward scenario for Outcome Lab page.
    */
   static modelForwardScenario(
-    baselineVisibility: number,
+    baselineVisibility: number | number[],
     multiplier: number,
     integrationType: string
   ): PredictionOutcome {
+    const baseValue = Array.isArray(baselineVisibility)
+      ? baselineVisibility[baselineVisibility.length - 1] || 100
+      : baselineVisibility;
+
     return {
       id: `pred_${Date.now()}`,
       scenario: integrationType,
-      predictedImpact: `+${(baselineVisibility * 0.15 * multiplier).toFixed(1)}% Local Visibility Recovery`,
+      predictedImpact: `+${(baseValue * 0.15 * multiplier).toFixed(1)}% Local Visibility Recovery`,
       confidenceScore: 0.92,
       recommendedBudgetShift: 'Reallocate non-performing paid search budget to high-intent GBP Local Ads',
       projectedRankChange: -2.4,
