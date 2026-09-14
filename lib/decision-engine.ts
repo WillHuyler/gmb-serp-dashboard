@@ -1,99 +1,81 @@
-export type EvidenceGrade = 'A' | 'B' | 'C' | 'D';
+import { createClient } from '@supabase/supabase-js';
 
-export interface ModelAssumptions {
-  label: string;
-  sensitivity: 'high' | 'medium' | 'low';
-}
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL || '',
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ''
+);
 
-export interface PredictionOutcome {
-  baselineValue: number;
-  expectedValue: number;
-  rangeMin: number;
-  rangeMax: number;
-  expectedLiftPercent: number;
-  confidenceScore: number;
-  evidenceGrade: EvidenceGrade;
-  assumptions: ModelAssumptions[];
-  constraints: string[];
-  dataSources: string[];
-  modelVersion: string;
-  rigorWarning?: string;
-}
-
-export interface TargetInput {
-  targetMetric: string;
-  desiredValue: number;
-  currentValue: number;
-  maxBudgetIncreasePercent?: number;
-  timeframeDays: number;
+export interface SignalIntervention {
+  tenant_id: string;
+  client_id: string;
+  severity: 'CRITICAL' | 'WARNING' | 'INFO';
+  signal_type: 'SERP_PACK_DROP' | 'SPEND_SPIKE' | 'CONVERSION_BOTTLENECK';
+  title: string;
+  message: string;
+  recommended_action: string;
 }
 
 export class DecisionEngine {
-  private static readonly MODEL_VERSION = "v1.4.0-production";
+  /**
+   * Scans keyword telemetry to detect local pack drops (> 3 rank drop).
+   */
+  static async evaluateRankAnomalies(tenantId: string, clientId: string): Promise<SignalIntervention[]> {
+    const { data: keywords, error } = await supabase
+      .from('keyword_library')
+      .select(`
+        id,
+        keyword,
+        rank_history (
+          serp_rank,
+          created_at
+        )
+      `)
+      .eq('client_id', clientId);
 
-  public static modelForwardScenario(
-    historicalDataPoints: number[],
-    inputMultiplier: number,
-    channelSource: string
-  ): PredictionOutcome {
-    const sampleSize = historicalDataPoints.length;
-    const mean = historicalDataPoints.reduce((a, b) => a + b, 0) / (sampleSize || 1);
-    const variance = historicalDataPoints.reduce((a, b) => a + Math.pow(b - mean, 2), 0) / (sampleSize || 1);
-    const stdDev = Math.sqrt(variance);
+    if (error || !keywords) return [];
 
-    const elasticity = 0.65;
-    const modeledLift = (Math.pow(inputMultiplier, elasticity) - 1);
-    const expectedValue = mean * (1 + modeledLift);
-    
-    const marginOfError = (1.96 * (stdDev / Math.sqrt(sampleSize || 1))) + (expectedValue * 0.05);
-    const rangeMin = Math.max(0, expectedValue - marginOfError);
-    const rangeMax = expectedValue + marginOfError;
+    const interventions: SignalIntervention[] = [];
 
-    let grade: EvidenceGrade = 'C';
-    let confidence = 65;
+    for (const kw of keywords) {
+      const history = (kw as any).rank_history || [];
+      if (history.length < 2) continue;
 
-    if (sampleSize > 90) {
-      grade = 'A';
-      confidence = 88;
-    } else if (sampleSize > 30) {
-      grade = 'B';
-      confidence = 74;
-    } else if (sampleSize < 10) {
-      grade = 'D';
-      confidence = 45;
+      const latestRank = history[0].serp_rank;
+      const previousRank = history[1].serp_rank;
+
+      // Rule: Drop out of Top 3 Local Pack
+      if (previousRank <= 3 && latestRank > 3) {
+        interventions.push({
+          tenant_id: tenantId,
+          client_id: clientId,
+          severity: 'CRITICAL',
+          signal_type: 'SERP_PACK_DROP',
+          title: `Local Pack Loss: ${kw.keyword}`,
+          message: `Keyword "${kw.keyword}" dropped from position #${previousRank} to #${latestRank}, losing Top 3 Local Pack placement.`,
+          recommended_action: 'Audit primary GBP category assignment and request immediate local citation sync.',
+        });
+      }
     }
 
-    return {
-      baselineValue: Number(mean.toFixed(2)),
-      expectedValue: Number(expectedValue.toFixed(2)),
-      rangeMin: Number(rangeMin.toFixed(2)),
-      rangeMax: Number(rangeMax.toFixed(2)),
-      expectedLiftPercent: Number((modeledLift * 100).toFixed(1)),
-      confidenceScore: confidence,
-      evidenceGrade: grade,
-      assumptions: [
-        { label: "Competitor bid landscapes remain within +/- 10% baseline variance", sensitivity: "high" },
-        { label: "Local conversion rates hold constant across projected volume increase", sensitivity: "medium" }
-      ],
-      constraints: [
-        "Budget caps enforced per channel daily ceiling",
-        "Geographic targeting restricted to active client Zip Codes"
-      ],
-      dataSources: [channelSource, "PorchLight Anonymized Sector Benchmarks"],
-      modelVersion: this.MODEL_VERSION,
-      rigorWarning: grade === 'D' ? "Limited historical depth detected. Confidence bounds expanded." : undefined
-    };
+    return interventions;
   }
 
-  public static modelReverseOptimization(
-    target: TargetInput,
-    availableChannels: string[]
-  ): PredictionOutcome[] {
-    const requiredLift = ((target.desiredValue - target.currentValue) / (target.currentValue || 1));
-    
-    const strategyA = this.modelForwardScenario([target.currentValue, target.currentValue * 1.05], 1 + (requiredLift * 0.8), "Google Ads + OtterWatch Local SERP");
-    const strategyB = this.modelForwardScenario([target.currentValue, target.currentValue * 0.98], 1 + (requiredLift * 1.1), "OtterWatch Local Pack Optimization");
+  /**
+   * Persists evaluated interventions to the signals ledger.
+   */
+  static async persistInterventions(interventions: SignalIntervention[]) {
+    if (interventions.length === 0) return;
 
-    return [strategyA, strategyB];
+    const { error } = await supabase.from('signals').insert(
+      interventions.map((i) => ({
+        ...i,
+        is_resolved: false,
+        created_at: new Date().toISOString(),
+      }))
+    );
+
+    if (error) {
+      console.error('Failed to persist Beacon interventions:', error.message);
+    }
   }
 }
