@@ -1,8 +1,12 @@
 "use client";
 import React, { useState, useEffect } from 'react';
 import { createClient } from '@supabase/supabase-js';
-import { Sparkles, Lock, Search, Bot, RefreshCw } from 'lucide-react';
+import { useSearchParams, useRouter, usePathname } from 'next/navigation';
+import { Sparkles, Lock, RefreshCw, Printer } from 'lucide-react';
 import { MarketingTimeline } from '../../components/timeline/MarketingTimeline';
+import { DemoControls } from '../../components/demo/DemoControls';
+import { MetricRegistry, CanonicalMetricResult } from '../../lib/metrics/registry';
+import { DataCertificationBadge, CertificationStatus } from '../../components/trust/DataCertificationBadge';
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL || '',
@@ -10,30 +14,39 @@ const supabase = createClient(
 );
 
 export default function CommandCenterPage() {
+  const searchParams = useSearchParams();
+  const router = useRouter();
+  const pathname = usePathname();
+
   const [clients, setClients] = useState<any[]>([]);
   const [selectedClient, setSelectedClient] = useState<string>('');
   const [keywords, setKeywords] = useState<any[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
+  const [demoAnomaly, setDemoAnomaly] = useState<string>('baseline');
 
   useEffect(() => {
+    async function loadClients() {
+      const { data } = await supabase.from('clients').select('*');
+      if (data && data.length > 0) {
+        setClients(data);
+        const urlClient = searchParams.get('client');
+        if (urlClient && data.some((c) => c.id === urlClient)) {
+          setSelectedClient(urlClient);
+        } else {
+          setSelectedClient(data[0].id);
+        }
+      } else {
+        setLoading(false);
+      }
+    }
     loadClients();
-  }, []);
+  }, [searchParams]);
 
   useEffect(() => {
     if (selectedClient) {
       loadClientTelemetry();
     }
   }, [selectedClient]);
-
-  async function loadClients() {
-    const { data } = await supabase.from('clients').select('*');
-    if (data && data.length > 0) {
-      setClients(data);
-      setSelectedClient(data[0].id);
-    } else {
-      setLoading(false);
-    }
-  }
 
   async function loadClientTelemetry() {
     setLoading(true);
@@ -44,43 +57,73 @@ export default function CommandCenterPage() {
 
     if (data) {
       setKeywords(data);
+    } else {
+      setKeywords([]);
     }
     setLoading(false);
   }
 
-  // Calculate live telemetry metrics from Supabase data
+  const handleClientChange = (clientId: string) => {
+    setSelectedClient(clientId);
+    const params = new URLSearchParams(searchParams.toString());
+    params.set('client', clientId);
+    router.push(`${pathname}?${params.toString()}`);
+  };
+
+  const handlePrint = () => {
+    window.print();
+  };
+
+  const currentClientObj = clients.find((c) => c.id === selectedClient);
+
   const activeKeywords = keywords.filter((k) => k.is_active);
-  const totalTerms = keywords.length;
+  const visibilityMetric: CanonicalMetricResult<number> = MetricRegistry.calculateLocalVisibility(
+    currentClientObj?.tenant_id || '',
+    selectedClient,
+    activeKeywords
+  );
 
-  const top3Count = activeKeywords.filter((kw) => {
-    const history = kw.rank_history || [];
-    const latest = history.sort(
-      (a: any, b: any) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
-    )[0];
-    return latest && latest.serp_rank > 0 && latest.serp_rank <= 3;
-  }).length;
+  let displayedVisibility = visibilityMetric.value;
+  if (displayedVisibility !== null && demoAnomaly === 'rank_drop') {
+    displayedVisibility = Math.max(0, displayedVisibility - 28);
+  }
 
-  const visibilityScore = totalTerms > 0 ? Math.round((top3Count / totalTerms) * 100) : 78;
+  const certStatus: CertificationStatus = currentClientObj?.data_certification_status || 
+    (visibilityMetric.healthStatus === 'VALID' ? 'DATA_CERTIFIED' : 'DATA_REVIEW_REQUIRED');
 
   return (
-    <div className="p-8 max-w-[1600px] mx-auto space-y-8 font-sans">
+    <div className="p-8 max-w-[1600px] mx-auto space-y-8 font-sans print:p-0 print:bg-white">
       
-      {/* Header & Client Switcher */}
+      <div className="print:hidden">
+        <DemoControls onTriggerScenario={(scenario) => setDemoAnomaly(scenario)} />
+      </div>
+
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-        <div>
-          <h1 className="text-2xl font-extrabold text-[#102033] tracking-tight">Executive Command Center</h1>
-          <p className="text-xs text-[#5E7187] mt-1">
-            Unified cross-channel marketing performance, statistical signals, and executive AI summary.
+        <div className="space-y-1">
+          <div className="flex items-center gap-3">
+            <h1 className="text-2xl font-extrabold text-[#102033] tracking-tight">Executive Command Center</h1>
+            <DataCertificationBadge status={certStatus} statusMessage={visibilityMetric.statusMessage} />
+          </div>
+          <p className="text-xs text-[#5E7187]">
+            Unified performance summary for <span className="text-[#FFC44D] font-bold">{currentClientObj?.name || 'Selected Entity'}</span>
           </p>
         </div>
 
-        <div className="flex items-center gap-4">
+        <div className="flex items-center gap-3">
+          <button
+            onClick={handlePrint}
+            className="print:hidden bg-[#FFFFFF] border border-[#E2E8F0] hover:bg-[#F4F6F8] text-[#102033] font-bold text-xs px-3.5 py-2 rounded-xl flex items-center gap-2 shadow-sm transition-all"
+          >
+            <Printer className="w-4 h-4 text-[#5E7187]" />
+            <span>Export Briefing PDF</span>
+          </button>
+
           <div className="flex items-center gap-2 bg-[#FFFFFF] border border-[#E2E8F0] px-3.5 py-2 rounded-xl shadow-sm">
             <span className="text-[10px] font-mono font-bold uppercase text-[#5E7187]">Entity:</span>
             <select
               value={selectedClient}
-              onChange={(e) => setSelectedClient(e.target.value)}
-              className="bg-transparent text-xs font-bold text-[#102033] focus:outline-none cursor-pointer max-w-[200px] truncate"
+              onChange={(e) => handleClientChange(e.target.value)}
+              className="bg-transparent text-xs font-bold text-[#102033] focus:outline-none cursor-pointer max-w-[220px] truncate"
             >
               {clients.map((c) => (
                 <option key={c.id} value={c.id}>
@@ -89,76 +132,66 @@ export default function CommandCenterPage() {
               ))}
             </select>
           </div>
-
-          <div className="flex gap-2 font-mono text-xs">
-            <div className="bg-[#FFFFFF] border border-[#E2E8F0] px-4 py-2 rounded-xl shadow-sm text-right">
-              <span className="text-[10px] text-[#5E7187] block uppercase font-bold">Total Spend</span>
-              <span className="text-xl font-extrabold text-[#102033]">$12,450.00</span>
-            </div>
-            <div className="bg-[#FFFFFF] border border-[#E2E8F0] px-4 py-2 rounded-xl shadow-sm text-right">
-              <span className="text-[10px] text-[#5E7187] block uppercase font-bold">Qualified Leads</span>
-              <span className="text-xl font-extrabold text-emerald-600">184</span>
-            </div>
-          </div>
         </div>
       </div>
 
-      {/* Beacon AI Executive Briefing */}
-      <div className="bg-[#08111F] text-white rounded-2xl p-6 border border-[#F5A000]/30 shadow-md relative overflow-hidden">
-        <div className="absolute top-0 right-0 p-8 opacity-10 pointer-events-none">
-          <Sparkles className="w-48 h-48 text-[#F5A000]" />
-        </div>
-
+      <div className="bg-[#08111F] text-white rounded-2xl p-6 border border-[#F5A000]/30 shadow-md relative overflow-hidden print:border-black print:bg-white print:text-black">
         <div className="flex items-center gap-2 mb-3">
           <div className="p-1.5 bg-[#0E192B] border border-[#F5A000]/40 rounded-lg">
-            <Sparkles className="w-4 h-4 text-[#F5A000] animate-pulse" />
+            <Sparkles className="w-4 h-4 text-[#F5A000]" />
           </div>
-          <span className="text-xs font-mono font-bold text-[#FFC44D] uppercase tracking-wider">
+          <span className="text-xs font-mono font-bold text-[#FFC44D] print:text-black uppercase tracking-wider">
             BEACON EXECUTIVE BRIEFING
           </span>
         </div>
 
-        <h2 className="text-base font-bold text-white mb-2">
-          Local Pack Visibility at {visibilityScore}% Across {totalTerms} Tracked Keywords
+        <h2 className="text-base font-bold text-white print:text-black mb-2">
+          {visibilityMetric.healthStatus === 'DATA_UNAVAILABLE'
+            ? `Telemetry Notice: No Active Keywords Tracked for ${currentClientObj?.name || 'Client'}`
+            : demoAnomaly === 'rank_drop'
+            ? 'Critical Alert: Local Visibility Loss (-28%) Detected across Zip Codes'
+            : `Local Pack Visibility at ${displayedVisibility}% Across ${activeKeywords.length} Tracked Terms`}
         </h2>
 
-        <p className="text-xs text-[#A9C7E5] leading-relaxed max-w-4xl">
-          Live telemetry from Supabase indicates <strong>{top3Count} search terms</strong> holding top-3 positions. Local inquiries remain stable, while Google Ads cost per acquisition drifted +60.2% due to search term expansion. Re-allocation recommended.
+        <p className="text-xs text-[#A9C7E5] print:text-gray-800 leading-relaxed max-w-4xl">
+          {visibilityMetric.healthStatus === 'DATA_UNAVAILABLE'
+            ? 'Add search terms with assigned target Zip Codes in OtterWatch SERP to calculate real-time visibility scores.'
+            : demoAnomaly === 'rank_drop'
+            ? 'Recent local pack shift displaced primary category terms into position #6+. Immediate GBP secondary listing update recommended.'
+            : `Live telemetry from Supabase verified across ${activeKeywords.length} terms for ${currentClientObj?.name || 'Client'}. Data certified against provider account mapped entities.`}
         </p>
       </div>
 
-      {/* Active vs Passive Channels Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        
-        {/* Active: OtterWatch SERP (Live Data) */}
         <div className="bg-[#FFFFFF] border border-[#E2E8F0] rounded-xl p-5 shadow-sm space-y-4">
           <div className="flex justify-between items-center">
-            <div className="flex items-center gap-2">
-              <Search className="w-4 h-4 text-[#3498DB]" />
-              <span className="text-xs font-extrabold text-[#102033]">OtterWatch SERP</span>
-            </div>
-            <span className="bg-emerald-100 text-emerald-700 text-[9px] font-mono px-2 py-0.5 rounded font-bold uppercase">
-              Supabase Live
+            <span className="text-xs font-extrabold text-[#102033]">OtterWatch SERP</span>
+            <span className={`text-[9px] font-mono px-2 py-0.5 rounded font-bold uppercase ${
+              visibilityMetric.healthStatus === 'VALID' ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'
+            }`}>
+              {visibilityMetric.healthStatus === 'VALID' ? 'Supabase Verified' : 'No Active Data'}
             </span>
           </div>
           <div>
             <span className="text-[10px] text-[#5E7187] uppercase font-mono">Local Visibility Score</span>
             <div className="text-2xl font-extrabold text-[#102033]">
-              {loading ? <RefreshCw className="w-5 h-5 animate-spin text-[#5E7187]" /> : `${visibilityScore}%`}
+              {loading ? (
+                <RefreshCw className="w-5 h-5 animate-spin text-[#5E7187]" />
+              ) : displayedVisibility !== null ? (
+                `${displayedVisibility}%`
+              ) : (
+                <span className="text-xs font-mono text-[#5E7187]">DATA UNAVAILABLE</span>
+              )}
             </div>
-            <span className="text-xs text-emerald-600 font-bold">
-              {top3Count} of {totalTerms} terms in Top 3
+            <span className="text-xs font-semibold text-[#5E7187]">
+              {visibilityMetric.provenance.sampleSize} tracked telemetry terms
             </span>
           </div>
         </div>
 
-        {/* Active: AI Presence */}
         <div className="bg-[#FFFFFF] border border-[#E2E8F0] rounded-xl p-5 shadow-sm space-y-4">
           <div className="flex justify-between items-center">
-            <div className="flex items-center gap-2">
-              <Bot className="w-4 h-4 text-[#F5A000]" />
-              <span className="text-xs font-extrabold text-[#102033]">AI Presence</span>
-            </div>
+            <span className="text-xs font-extrabold text-[#102033]">AI Presence</span>
             <span className="bg-emerald-100 text-emerald-700 text-[9px] font-mono px-2 py-0.5 rounded font-bold uppercase">
               Connected
             </span>
@@ -170,39 +203,27 @@ export default function CommandCenterPage() {
           </div>
         </div>
 
-        {/* Unconnected Placeholder: Paid Media */}
         <div className="bg-[#FFFFFF]/60 border border-dashed border-[#CBD5E1] rounded-xl p-5 shadow-sm flex flex-col justify-between">
           <div className="flex justify-between items-center">
-            <span className="text-xs font-bold text-[#5E7187]">Paid Media (Google/Meta)</span>
+            <span className="text-xs font-bold text-[#5E7187]">Paid Media</span>
             <Lock className="w-3.5 h-3.5 text-[#94A3B8]" />
           </div>
           <div className="my-4 text-center">
-            <span className="text-xs font-semibold text-[#64748B] block">Integration Needed</span>
-            <span className="text-[10px] text-[#94A3B8]">Connect Google Ads OAuth</span>
+            <span className="text-xs font-mono text-[#64748B] block">NOT CONNECTED</span>
           </div>
-          <button className="w-full bg-[#F4F6F8] hover:bg-[#E2E8F0] text-[#102033] font-bold text-xs py-1.5 rounded-lg transition-all">
-            Connect Channel
-          </button>
         </div>
 
-        {/* Unconnected Placeholder: CRM */}
         <div className="bg-[#FFFFFF]/60 border border-dashed border-[#CBD5E1] rounded-xl p-5 shadow-sm flex flex-col justify-between">
           <div className="flex justify-between items-center">
-            <span className="text-xs font-bold text-[#5E7187]">CRM Revenue Pipeline</span>
+            <span className="text-xs font-bold text-[#5E7187]">CRM Pipeline</span>
             <Lock className="w-3.5 h-3.5 text-[#94A3B8]" />
           </div>
           <div className="my-4 text-center">
-            <span className="text-xs font-semibold text-[#64748B] block">Integration Needed</span>
-            <span className="text-[10px] text-[#94A3B8]">Connect HubSpot / GHL</span>
+            <span className="text-xs font-mono text-[#64748B] block">NOT CONNECTED</span>
           </div>
-          <button className="w-full bg-[#F4F6F8] hover:bg-[#E2E8F0] text-[#102033] font-bold text-xs py-1.5 rounded-lg transition-all">
-            Connect Channel
-          </button>
         </div>
-
       </div>
 
-      {/* Cross-Channel Event Overlay Timeline */}
       <MarketingTimeline />
 
     </div>
