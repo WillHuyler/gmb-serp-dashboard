@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useTransition } from 'react';
-import { DecisionEngine, PredictionOutcome } from '@/lib/decision-engine';
+import { DecisionEngine, PredictionOutcome } from '../../lib/decision-engine';
 
 export default function OutcomeLabPage() {
   const [currentValue, setCurrentValue] = useState<number>(180);
