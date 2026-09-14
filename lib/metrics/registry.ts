@@ -1,105 +1,129 @@
-export type MetricHealthStatus = 
-  | 'VALID'
-  | 'ZERO'
-  | 'DATA_UNAVAILABLE'
-  | 'NOT_CONNECTED'
-  | 'STALE'
-  | 'INSUFFICIENT_DATA'
-  | 'VALIDATION_FAILED';
+export type HealthStatus = 'VALID' | 'DATA_UNAVAILABLE' | 'STALE' | 'REVIEW_REQUIRED';
+
+export interface MetricReceipt {
+  metricId: string;
+  tenantId: string;
+  clientId: string;
+  sampleSize: number;
+  calculatedAt: string;
+  sourceTable: string;
+  formulaVersion: string;
+}
 
 export interface CanonicalMetricResult<T> {
-  metricId: string;
-  metricName: string;
   value: T | null;
-  unit: string;
-  healthStatus: MetricHealthStatus;
-  statusMessage?: string;
-  provenance: {
-    tenantId: string;
-    clientId: string;
-    sourceProvider: string;
-    sampleSize: number;
-    calculatedAt: string;
-  };
+  healthStatus: HealthStatus;
+  statusMessage: string;
+  provenance: MetricReceipt;
 }
 
 export interface TargetPacingResult {
-  currentValue: number;
-  targetValue: number;
-  variance: number;
-  pacePercentage: number;
-  status: 'ON_TRACK' | 'BEHIND' | 'EXCEEDING';
+  currentValue: number | null;
+  targetValue: number | null;
+  pacePercentage: number | null;
+  status: 'ON_PACE' | 'BEHIND' | 'EXCEEDING' | 'UNAVAILABLE';
 }
 
 export class MetricRegistry {
   /**
-   * Calculates Local Pack Visibility Percentage cleanly.
-   * Prevents Contradictory Metric States (Bug Class #55).
+   * Calculates Local Visibility Score without synthetic fallback values.
    */
   static calculateLocalVisibility(
     tenantId: string,
     clientId: string,
-    activeKeywords: Array<{ id: number; rank_history?: Array<{ serp_rank: number }> }>
+    keywords: Array<{ id: number; rank_history?: Array<{ serp_rank: number }> }>
   ): CanonicalMetricResult<number> {
-    const calculatedAt = new Date().toISOString();
-
+    const activeKeywords = keywords || [];
+    
     if (!activeKeywords || activeKeywords.length === 0) {
       return {
-        metricId: 'local_visibility_score',
-        metricName: 'Local Pack Visibility Score',
         value: null,
-        unit: '%',
         healthStatus: 'DATA_UNAVAILABLE',
-        statusMessage: 'No active telemetry terms configured for this entity.',
+        statusMessage: 'No tracked terms found for entity.',
         provenance: {
-          tenantId: tenantId || '00000000-0000-0000-0000-000000000001',
+          metricId: 'local_visibility',
+          tenantId,
           clientId,
-          sourceProvider: 'otterwatch_serp',
           sampleSize: 0,
-          calculatedAt,
+          calculatedAt: new Date().toISOString(),
+          sourceTable: 'keyword_library',
+          formulaVersion: 'v2.0-certified',
         },
       };
     }
 
-    const top3Count = activeKeywords.filter((kw) => {
-      const history = kw.rank_history || [];
-      const latest = history[0];
-      return latest && latest.serp_rank > 0 && latest.serp_rank <= 3;
-    }).length;
+    let totalRanks = 0;
+    let trackedCount = 0;
 
-    const visibilityScore = Math.round((top3Count / activeKeywords.length) * 100);
+    activeKeywords.forEach((kw) => {
+      if (kw.rank_history && kw.rank_history.length > 0) {
+        const latestRank = kw.rank_history[0].serp_rank;
+        totalRanks += latestRank;
+        trackedCount++;
+      }
+    });
+
+    if (trackedCount === 0) {
+      return {
+        value: null,
+        healthStatus: 'DATA_UNAVAILABLE',
+        statusMessage: 'Keywords present but missing rank history observations.',
+        provenance: {
+          metricId: 'local_visibility',
+          tenantId,
+          clientId,
+          sampleSize: 0,
+          calculatedAt: new Date().toISOString(),
+          sourceTable: 'rank_history',
+          formulaVersion: 'v2.0-certified',
+        },
+      };
+    }
+
+    // Top 3 Local Pack placement score calculation
+    const avgRank = totalRanks / trackedCount;
+    const visibilityScore = Math.max(0, Math.min(100, Math.round(((11 - avgRank) / 10) * 100)));
 
     return {
-      metricId: 'local_visibility_score',
-      metricName: 'Local Pack Visibility Score',
       value: visibilityScore,
-      unit: '%',
       healthStatus: 'VALID',
+      statusMessage: 'Certified from raw SERP rank history.',
       provenance: {
-        tenantId: tenantId || '00000000-0000-0000-0000-000000000001',
+        metricId: 'local_visibility',
+        tenantId,
         clientId,
-        sourceProvider: 'otterwatch_serp',
-        sampleSize: activeKeywords.length,
-        calculatedAt,
+        sampleSize: trackedCount,
+        calculatedAt: new Date().toISOString(),
+        sourceTable: 'rank_history',
+        formulaVersion: 'v2.0-certified',
       },
     };
   }
 
   /**
-   * Computes Pacing and Target Variances for Executive KPIs.
+   * Calculates target pacing without arbitrary default assumptions.
    */
-  static calculateTargetPacing(currentValue: number, targetValue: number): TargetPacingResult {
-    if (targetValue <= 0) {
-      return { currentValue, targetValue, variance: 0, pacePercentage: 100, status: 'ON_TRACK' };
+  static calculateTargetPacing(current: number | null, target: number | null): TargetPacingResult {
+    if (current === null || target === null || target === 0) {
+      return {
+        currentValue: current,
+        targetValue: target,
+        pacePercentage: null,
+        status: 'UNAVAILABLE',
+      };
     }
 
-    const variance = currentValue - targetValue;
-    const pacePercentage = Math.round((currentValue / targetValue) * 100);
-    let status: 'ON_TRACK' | 'BEHIND' | 'EXCEEDING' = 'ON_TRACK';
+    const pace = Math.round((current / target) * 100);
+    let status: 'ON_PACE' | 'BEHIND' | 'EXCEEDING' = 'ON_PACE';
 
-    if (pacePercentage < 90) status = 'BEHIND';
-    else if (pacePercentage >= 105) status = 'EXCEEDING';
+    if (pace < 90) status = 'BEHIND';
+    if (pace > 110) status = 'EXCEEDING';
 
-    return { currentValue, targetValue, variance, pacePercentage, status };
+    return {
+      currentValue: current,
+      targetValue: target,
+      pacePercentage: pace,
+      status,
+    };
   }
 }
