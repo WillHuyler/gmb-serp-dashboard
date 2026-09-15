@@ -8,7 +8,7 @@ export default function OutcomeLabPage() {
   const [simulationMode, setSimulationMode] = useState<'REVERSE' | 'FORWARD'>('REVERSE');
   const [isDeploying, setIsDeploying] = useState<boolean>(false);
 
-  // Client Baseline Telemetry State (Pulled dynamically per active client)
+  // Client Baseline Telemetry State (Derived dynamically from active client context)
   const [baselineLeads, setBaselineLeads] = useState<number>(180);
   const [baselineSpend, setBaselineSpend] = useState<number>(7500);
   const [timeframe, setTimeframe] = useState<number>(90);
@@ -19,50 +19,51 @@ export default function OutcomeLabPage() {
 
   // Mode Y Inputs: Reverse Outcome Targeting ("What do we need to do to achieve Y?")
   const [targetLeadIncreasePercent, setTargetLeadIncreasePercent] = useState<number>(20); // e.g., +20% leads
-  const [spendCapPercent, setSpendCapPercent] = useState<number>(10); // e.g., Spend cap <= 10%
+  const [spendCapPercent, setSpendCapPercent] = useState<number>(10); // e.g., spend cap <= 10%
 
-  // Synchronize baseline numbers when activeClient updates
+  // Synchronize client baselines whenever activeClient changes
   useEffect(() => {
     if (activeClient) {
-      // Deterministic client baseline derived from client context
-      const isCertified = activeClient.is_certified ?? false;
+      const isCertified = Boolean(activeClient.is_certified);
       setBaselineLeads(isCertified ? 240 : 180);
       setBaselineSpend(isCertified ? 9600 : 7500);
     }
   }, [activeClient]);
 
-  // Derived Baseline CPL
-  const baselineCPL = baselineSpend / baselineLeads;
+  // Derived calculations
+  const baselineCPL = baselineLeads > 0 ? baselineSpend / baselineLeads : 41.66;
 
-  // FORWARD MODELING COMPUTATIONS ("What happens if we do X?")
-  const projectedSpendIncrease = selectedAction === 'GOOGLE_ADS_SPEND' 
-    ? baselineSpend * (actionIntensityPercent / 100)
-    : selectedAction === 'OMNICHANNEL_BLENDED'
-    ? baselineSpend * ((actionIntensityPercent * 0.7) / 100)
-    : 1200; // Fixed local optimization cost for SERP
+  // FORWARD MODELING MATH ("What happens if we do X?")
+  const projectedSpendIncrease =
+    selectedAction === 'GOOGLE_ADS_SPEND'
+      ? baselineSpend * (actionIntensityPercent / 100)
+      : selectedAction === 'OMNICHANNEL_BLENDED'
+      ? baselineSpend * ((actionIntensityPercent * 0.7) / 100)
+      : 1200; // Flat local optimization cost for SERP
 
   const projectedLeadYield = Math.round(
     selectedAction === 'GOOGLE_ADS_SPEND'
-      ? baselineLeads * (1 + (actionIntensityPercent * 0.0075))
+      ? baselineLeads * (1 + actionIntensityPercent * 0.0075)
       : selectedAction === 'OTTERWATCH_SERP'
-      ? baselineLeads * (1 + (actionIntensityPercent * 0.012))
-      : baselineLeads * (1 + (actionIntensityPercent * 0.0095))
+      ? baselineLeads * (1 + actionIntensityPercent * 0.012)
+      : baselineLeads * (1 + actionIntensityPercent * 0.0095)
   );
 
   const netNewLeads = projectedLeadYield - baselineLeads;
   const newTotalSpend = baselineSpend + projectedSpendIncrease;
-  const projectedCPL = (newTotalSpend / projectedLeadYield).toFixed(2);
+  const projectedCPL = projectedLeadYield > 0 ? (newTotalSpend / projectedLeadYield).toFixed(2) : '0.00';
 
-  // REVERSE TARGETING COMPUTATIONS ("What do we need to do to achieve Y?")
+  // REVERSE TARGETING MATH ("What do we need to do to achieve Y?")
   const targetLeadGoal = Math.round(baselineLeads * (1 + targetLeadIncreasePercent / 100));
   const leadDeficit = Math.max(0, targetLeadGoal - baselineLeads);
   const maxSpendAllowed = baselineSpend * (1 + spendCapPercent / 100);
   const maxBudgetExpansion = maxSpendAllowed - baselineSpend;
 
   // Back-solving required organic SERP signal lift to meet gap within spend cap
-  const paidCapacityLeads = Math.floor(maxBudgetExpansion / baselineCPL);
+  const paidCapacityLeads = baselineCPL > 0 ? Math.floor(maxBudgetExpansion / baselineCPL) : 0;
   const organicRequiredLeads = Math.max(0, leadDeficit - paidCapacityLeads);
-  const requiredSerpVelocityLift = ((organicRequiredLeads / baselineLeads) * 100 * 2.1).toFixed(1);
+  const requiredSerpVelocityLift =
+    baselineLeads > 0 ? ((organicRequiredLeads / baselineLeads) * 100 * 2.1).toFixed(1) : '0.0';
 
   const handleDeploy = async (strategyName: string) => {
     setIsDeploying(true);
@@ -100,7 +101,8 @@ export default function OutcomeLabPage() {
             </span>
           </div>
           <p className="text-sm text-slate-400 mt-1">
-            Simulate operational actions or back-solve execution paths directly for <strong className="text-amber-400 font-mono">{activeClient?.name || 'Active Prospect'}</strong>.
+            Simulate operational actions or back-solve execution paths directly for{' '}
+            <strong className="text-amber-400 font-mono">{activeClient?.name || 'Active Prospect'}</strong>.
           </p>
         </div>
 
@@ -225,7 +227,7 @@ export default function OutcomeLabPage() {
               </div>
 
               <div className="p-4 bg-[#0B0F17] border border-amber-500/30 rounded-lg space-y-1">
-                <span className="text-[10px] font-mono text-amber-400 uppercase block">BACK-SOLVED LOCAL SIGNAL velocity NEEDED</span>
+                <span className="text-[10px] font-mono text-amber-400 uppercase block">BACK-SOLVED LOCAL SIGNAL VELOCITY NEEDED</span>
                 <div className="text-2xl font-bold font-mono text-white">+{requiredSerpVelocityLift}%</div>
                 <span className="text-[10px] text-slate-400 font-mono block">
                   GAP: {leadDeficit} LEADS | SPEND CAP: ≤ +${maxBudgetExpansion.toFixed(0)}/mo
@@ -256,7 +258,7 @@ export default function OutcomeLabPage() {
               </div>
 
               <p className="text-xs text-slate-300 leading-relaxed">
-                To achieve <strong className="text-amber-400">+{targetLeadIncreasePercent}% qualified leads ({targetLeadGoal} total)</strong> within {timeframe} days for <strong>{activeClient?.name}</strong> while keeping media spend expansion under <strong className="text-emerald-400">≤{spendCapPercent}%</strong>, PorchLight back-solves the following execution plan:
+                To achieve <strong className="text-amber-400">+{targetLeadIncreasePercent}% qualified leads ({targetLeadGoal} total)</strong> within {timeframe} days for <strong>{activeClient?.name || 'Active Prospect'}</strong> while keeping media spend expansion under <strong className="text-emerald-400">≤{spendCapPercent}%</strong>, PorchLight back-solves the following execution plan:
               </p>
 
               <div className="space-y-3 bg-[#0B0F17] p-4 rounded-lg border border-[#A9C7E5]/10 font-mono text-xs">
@@ -295,7 +297,7 @@ export default function OutcomeLabPage() {
               </div>
 
               <p className="text-xs text-slate-300 leading-relaxed">
-                Executing a <strong className="text-[#55A9E6]">+{actionIntensityPercent}% adjustment</strong> on {selectedAction.replace(/_/g, ' ')} yields the following forecast over {timeframe} days for <strong>{activeClient?.name}</strong>:
+                Executing a <strong className="text-[#55A9E6]">+{actionIntensityPercent}% adjustment</strong> on {selectedAction.replace(/_/g, ' ')} yields the following forecast over {timeframe} days for <strong>{activeClient?.name || 'Active Prospect'}</strong>:
               </p>
 
               <div className="grid grid-cols-3 gap-4 font-mono text-center">
