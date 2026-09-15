@@ -1,56 +1,187 @@
 'use client';
 
 import React from 'react';
-import Link from 'next/link';
 import { useClient } from '../lib/client-context';
+import PlaidInsightsPanel from '../components/beacon/PlaidInsightsPanel';
 
-export default function HomePage() {
-  const { activeClient } = useClient();
+export default function DashboardPage() {
+  const { activeClient, setActiveClient } = useClient();
 
   return (
-    <div className="p-8 space-y-8 bg-[#0B0F17] text-white min-h-screen">
-      <div className="flex justify-between items-center border-b border-[#A9C7E5]/10 pb-6">
+    <div className="space-y-6 text-[#0B1F3A]">
+      {/* 1. HEADER SECTION */}
+      <div className="flex justify-between items-start">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight text-white">PORCHLIGHT DECISION PLATFORM</h1>
-          <p className="text-sm text-slate-400 mt-1">
-            Active Prospect Context: <strong className="text-amber-400 font-mono">{activeClient?.name || 'Loading Client...'}</strong>
+          <span className="text-[10px] font-mono uppercase tracking-widest text-slate-400 font-bold block">
+            CLIENT DASHBOARD
+          </span>
+          <h1 className="text-2xl font-bold tracking-tight text-[#0B1F3A] mt-0.5">
+            {activeClient?.name || 'High Rise Chimney Sweep & Service'}
+          </h1>
+          <p className="text-xs text-[#53657D] mt-1">
+            Local search intelligence, paid media performance, and growth opportunities — all in one place.
           </p>
         </div>
-        <div className="flex space-x-3">
-          <Link
-            href={activeClient?.id ? `/outcome-lab?clientId=${activeClient.id}` : '/outcome-lab'}
-            className="bg-amber-500 text-black text-xs font-mono font-bold px-4 py-2 rounded hover:bg-amber-400 transition-all"
-          >
-            LAUNCH OUTCOME LAB
-          </Link>
-          <Link
-            href={activeClient?.id ? `/connection-center?clientId=${activeClient.id}` : '/connection-center'}
-            className="bg-[#55A9E6]/10 border border-[#55A9E6]/30 text-[#55A9E6] text-xs font-mono font-bold px-4 py-2 rounded hover:bg-[#55A9E6]/20 transition-all"
-          >
-            CONNECTION CENTER
-          </Link>
+
+        {/* TOP ACTION HIERARCHY */}
+        <div className="flex items-center space-x-3">
+          <button className="bg-[#D99614] hover:bg-[#B97A08] text-white font-mono font-bold text-xs px-4 py-2.5 rounded-lg shadow-sm transition-all flex items-center space-x-1.5">
+            <span>⚡</span>
+            <span>Analyze & Recommend</span>
+          </button>
+          <button className="bg-white border border-[#DCE5EF] hover:bg-[#F4F7FB] text-[#0B1F3A] font-mono text-xs px-3.5 py-2.5 rounded-lg shadow-sm transition-all">
+            Export PDF
+          </button>
+          <button className="bg-white border border-[#DCE5EF] hover:bg-[#F4F7FB] text-[#0B1F3A] font-mono text-xs px-3.5 py-2.5 rounded-lg shadow-sm transition-all flex items-center space-x-1">
+            <span>✨</span>
+            <span>Copy Gemini Prompt</span>
+          </button>
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <div className="bg-[#111622] border border-[#A9C7E5]/10 rounded-xl p-6 space-y-4">
-          <div className="flex items-center space-x-2">
-            <span className="text-amber-400 font-mono text-sm">🎯</span>
-            <h2 className="text-sm font-mono font-bold uppercase tracking-wider text-white">REVERSE OUTCOME TARGETING</h2>
-          </div>
-          <p className="text-xs text-slate-300 leading-relaxed">
-            Work backward from desired business outcomes ("What do we need to do to achieve Y?"). Back-solve required local SERP velocity, campaign budget caps, and conversion lift.
-          </p>
+      {/* 2. FILTER & CONTROL BAR */}
+      <div className="bg-white border border-[#DCE5EF] rounded-xl p-4 grid grid-cols-1 md:grid-cols-4 gap-4 shadow-sm">
+        <div>
+          <label className="text-[10px] font-mono text-slate-400 uppercase font-bold block mb-1">
+            CLIENT
+          </label>
+          <select
+            value={activeClient?.id || ''}
+            onChange={(e) => setActiveClient(e.target.value)}
+            className="w-full bg-white border border-[#DCE5EF] rounded-lg px-3 py-2 text-xs font-bold text-[#0B1F3A] focus:outline-none focus:border-[#D99614]"
+          >
+            <option value="a1b2c3d4-e5f6-7890-abcd-ef1234567890">ABC Motors (Uncertified)</option>
+            <option value="bf93fef0-fc60-4119-8ea2-68a274984355">Apex Dental Group (Certified)</option>
+            <option value="c2d3e4f5-a6b7-8901-bcde-f23456789012">Kelly Hyundai (Certified)</option>
+          </select>
         </div>
 
-        <div className="bg-[#111622] border border-[#A9C7E5]/10 rounded-xl p-6 space-y-4">
-          <div className="flex items-center space-x-2">
-            <span className="text-[#55A9E6] font-mono text-sm">🔮</span>
-            <h2 className="text-sm font-mono font-bold uppercase tracking-wider text-white">FORWARD MODELING</h2>
+        <div>
+          <label className="text-[10px] font-mono text-slate-400 uppercase font-bold block mb-1">
+            PLATFORM
+          </label>
+          <select className="w-full bg-white border border-[#DCE5EF] rounded-lg px-3 py-2 text-xs font-bold text-[#0B1F3A] focus:outline-none">
+            <option>Google My Business (GMB)</option>
+            <option>Google Ads (PPC)</option>
+            <option>Meta Ads</option>
+          </select>
+        </div>
+
+        <div>
+          <label className="text-[10px] font-mono text-slate-400 uppercase font-bold block mb-1">
+            COMPARE
+          </label>
+          <select className="w-full bg-white border border-[#DCE5EF] rounded-lg px-3 py-2 text-xs font-bold text-[#0B1F3A] focus:outline-none">
+            <option>MTD vs. Last MTD</option>
+            <option>QTD vs. Last QTD</option>
+            <option>YoY Performance</option>
+          </select>
+        </div>
+
+        <div>
+          <label className="text-[10px] font-mono text-slate-400 uppercase font-bold block mb-1">
+            SERVICE AREA
+          </label>
+          <select className="w-full bg-white border border-[#DCE5EF] rounded-lg px-3 py-2 text-xs font-bold text-[#0B1F3A] focus:outline-none">
+            <option>All Service Territory ZIPs (5)</option>
+            <option>Primary ZIP (53202)</option>
+          </select>
+        </div>
+      </div>
+
+      {/* 3. MAIN WORKSPACE GRID WITH PLAID AI PANEL */}
+      <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
+        {/* LEFT 3 COLUMNS: KPI & CHARTS */}
+        <div className="lg:col-span-3 space-y-6">
+          {/* SEMANTIC TINTED KPI CARDS */}
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <div className="bg-[#EBF3FF] border border-[#DCE5EF] rounded-xl p-4 space-y-1">
+              <div className="flex justify-between items-center text-xs text-[#53657D] font-mono font-bold">
+                <span>INTERACTIONS</span>
+                <span>💬</span>
+              </div>
+              <div className="text-2xl font-bold text-[#0B1F3A]">68</div>
+              <div className="text-[11px] font-mono text-[#12A36D] font-bold">
+                ↑ +75% <span className="text-slate-400 font-normal">vs. Last MTD</span>
+              </div>
+            </div>
+
+            <div className="bg-[#EAF8F2] border border-[#DCE5EF] rounded-xl p-4 space-y-1">
+              <div className="flex justify-between items-center text-xs text-[#53657D] font-mono font-bold">
+                <span>PHONE CALLS</span>
+                <span>📞</span>
+              </div>
+              <div className="text-2xl font-bold text-[#0B1F3A]">14</div>
+              <div className="text-[11px] font-mono text-[#12A36D] font-bold">
+                ↑ +45% <span className="text-slate-400 font-normal">vs. Last MTD</span>
+              </div>
+            </div>
+
+            <div className="bg-[#F1EEFF] border border-[#DCE5EF] rounded-xl p-4 space-y-1">
+              <div className="flex justify-between items-center text-xs text-[#53657D] font-mono font-bold">
+                <span>DIRECTIONS</span>
+                <span>📍</span>
+              </div>
+              <div className="text-2xl font-bold text-[#0B1F3A]">18</div>
+              <div className="text-[11px] font-mono text-[#12A36D] font-bold">
+                ↑ +33% <span className="text-slate-400 font-normal">vs. Last MTD</span>
+              </div>
+            </div>
+
+            <div className="bg-[#FFF4EB] border border-[#DCE5EF] rounded-xl p-4 space-y-1">
+              <div className="flex justify-between items-center text-xs text-[#53657D] font-mono font-bold">
+                <span>WEBSITE CLICKS</span>
+                <span>🖱️</span>
+              </div>
+              <div className="text-2xl font-bold text-[#0B1F3A]">36</div>
+              <div className="text-[11px] font-mono text-[#12A36D] font-bold">
+                ↑ +77% <span className="text-slate-400 font-normal">vs. Last MTD</span>
+              </div>
+            </div>
           </div>
-          <p className="text-xs text-slate-300 leading-relaxed">
-            Predict outcomes from operational inputs ("What happens if we do X?"). Run probabilistic simulations on media budget shifts and local rank movements.
-          </p>
+
+          {/* SERVICE TERRITORY & VISIBILITY TREND */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="bg-white border border-[#DCE5EF] rounded-xl p-5 space-y-4 shadow-sm">
+              <div className="flex justify-between items-center">
+                <h3 className="text-xs font-bold font-mono text-[#0B1F3A] uppercase tracking-wider">
+                  Service Territory Performance
+                </h3>
+                <span className="text-[10px] font-mono text-slate-400">All GBP ZIPs</span>
+              </div>
+              <div className="space-y-2 font-mono text-xs">
+                {[
+                  { zip: '53202', rank: '#3', change: '+2' },
+                  { zip: '53211', rank: '#2', change: '+1' },
+                  { zip: '53217', rank: '#3', change: '+3' },
+                  { zip: '53092', rank: '#2', change: '+1' },
+                ].map((row, i) => (
+                  <div key={i} className="flex justify-between items-center p-2.5 bg-[#F4F7FB] rounded-lg">
+                    <span className="font-bold text-[#0B1F3A]">ZIP {row.zip}</span>
+                    <span className="text-[#12A36D] font-bold">{row.rank} Map Pack</span>
+                    <span className="text-[#12A36D] text-[11px]">↑ {row.change}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div className="bg-white border border-[#DCE5EF] rounded-xl p-5 space-y-4 shadow-sm">
+              <div className="flex justify-between items-center">
+                <h3 className="text-xs font-bold font-mono text-[#0B1F3A] uppercase tracking-wider">
+                  Local Visibility Trend
+                </h3>
+                <span className="text-[10px] font-mono text-slate-400">Last 90 Days</span>
+              </div>
+              <div className="h-40 bg-[#F4F7FB] border border-[#DCE5EF] rounded-lg flex items-center justify-center font-mono text-xs text-slate-400">
+                [ Time-Series Chart Component: ZIP 53202 / 53211 / 53217 ]
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* RIGHT COLUMN: PLAID AI INSIGHTS RAIL */}
+        <div className="lg:col-span-1">
+          <PlaidInsightsPanel />
         </div>
       </div>
     </div>
