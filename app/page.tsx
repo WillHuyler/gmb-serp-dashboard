@@ -3,11 +3,11 @@
 import React from 'react';
 import { useClient } from '../lib/client-context';
 import PlaidInsightsPanel from '../components/beacon/PlaidInsightsPanel';
+import TerritoryPerformance from '../components/analytics/TerritoryPerformance';
 
 export default function DashboardPage() {
   const { activeClient, setActiveClient } = useClient();
 
-  // Pre-defined client lookup array to pass the full Client object to setActiveClient
   const availableClients = [
     {
       id: 'a1b2c3d4-e5f6-7890-abcd-ef1234567890',
@@ -171,30 +171,9 @@ export default function DashboardPage() {
             </div>
           </div>
 
-          {/* SERVICE TERRITORY & VISIBILITY TREND */}
+          {/* SERVICE TERRITORY VISUAL MAP & VISIBILITY TREND */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div className="bg-white border border-[#DCE5EF] rounded-xl p-5 space-y-4 shadow-sm">
-              <div className="flex justify-between items-center">
-                <h3 className="text-xs font-bold font-mono text-[#0B1F3A] uppercase tracking-wider">
-                  Service Territory Performance
-                </h3>
-                <span className="text-[10px] font-mono text-slate-400">All GBP ZIPs</span>
-              </div>
-              <div className="space-y-2 font-mono text-xs">
-                {[
-                  { zip: '53202', rank: '#3', change: '+2' },
-                  { zip: '53211', rank: '#2', change: '+1' },
-                  { zip: '53217', rank: '#3', change: '+3' },
-                  { zip: '53092', rank: '#2', change: '+1' },
-                ].map((row, i) => (
-                  <div key={i} className="flex justify-between items-center p-2.5 bg-[#F4F7FB] rounded-lg">
-                    <span className="font-bold text-[#0B1F3A]">ZIP {row.zip}</span>
-                    <span className="text-[#12A36D] font-bold">{row.rank} Map Pack</span>
-                    <span className="text-[#12A36D] text-[11px]">↑ {row.change}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
+            <TerritoryPerformance />
 
             <div className="bg-white border border-[#DCE5EF] rounded-xl p-5 space-y-4 shadow-sm">
               <div className="flex justify-between items-center">
@@ -203,7 +182,7 @@ export default function DashboardPage() {
                 </h3>
                 <span className="text-[10px] font-mono text-slate-400">Last 90 Days</span>
               </div>
-              <div className="h-40 bg-[#F4F7FB] border border-[#DCE5EF] rounded-lg flex items-center justify-center font-mono text-xs text-slate-400">
+              <div className="h-56 bg-[#F4F7FB] border border-[#DCE5EF] rounded-lg flex items-center justify-center font-mono text-xs text-slate-400">
                 [ Time-Series Chart Component: ZIP 53202 / 53211 / 53217 ]
               </div>
             </div>
