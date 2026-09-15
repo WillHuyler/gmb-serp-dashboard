@@ -7,6 +7,35 @@ import PlaidInsightsPanel from '../components/beacon/PlaidInsightsPanel';
 export default function DashboardPage() {
   const { activeClient, setActiveClient } = useClient();
 
+  // Pre-defined client lookup array to pass the full Client object to setActiveClient
+  const availableClients = [
+    {
+      id: 'a1b2c3d4-e5f6-7890-abcd-ef1234567890',
+      name: 'ABC Motors',
+      tenant_id: '00000000-0000-0000-0000-000000000001',
+      is_certified: false,
+    },
+    {
+      id: 'bf93fef0-fc60-4119-8ea2-68a274984355',
+      name: 'Apex Dental Group',
+      tenant_id: '00000000-0000-0000-0000-000000000001',
+      is_certified: true,
+    },
+    {
+      id: 'c2d3e4f5-a6b7-8901-bcde-f23456789012',
+      name: 'Kelly Hyundai',
+      tenant_id: '00000000-0000-0000-0000-000000000001',
+      is_certified: true,
+    },
+  ];
+
+  const handleClientChange = (clientId: string) => {
+    const selected = availableClients.find((c) => c.id === clientId);
+    if (selected) {
+      setActiveClient(selected);
+    }
+  };
+
   return (
     <div className="space-y-6 text-[#0B1F3A]">
       {/* 1. HEADER SECTION */}
@@ -25,14 +54,14 @@ export default function DashboardPage() {
 
         {/* TOP ACTION HIERARCHY */}
         <div className="flex items-center space-x-3">
-          <button className="bg-[#D99614] hover:bg-[#B97A08] text-white font-mono font-bold text-xs px-4 py-2.5 rounded-lg shadow-sm transition-all flex items-center space-x-1.5">
+          <button className="bg-[#D99614] hover:bg-[#B97A08] text-white font-mono font-bold text-xs px-4 py-2.5 rounded-lg shadow-sm transition-all flex items-center space-x-1.5 cursor-pointer">
             <span>⚡</span>
             <span>Analyze & Recommend</span>
           </button>
-          <button className="bg-white border border-[#DCE5EF] hover:bg-[#F4F7FB] text-[#0B1F3A] font-mono text-xs px-3.5 py-2.5 rounded-lg shadow-sm transition-all">
+          <button className="bg-white border border-[#DCE5EF] hover:bg-[#F4F7FB] text-[#0B1F3A] font-mono text-xs px-3.5 py-2.5 rounded-lg shadow-sm transition-all cursor-pointer">
             Export PDF
           </button>
-          <button className="bg-white border border-[#DCE5EF] hover:bg-[#F4F7FB] text-[#0B1F3A] font-mono text-xs px-3.5 py-2.5 rounded-lg shadow-sm transition-all flex items-center space-x-1">
+          <button className="bg-white border border-[#DCE5EF] hover:bg-[#F4F7FB] text-[#0B1F3A] font-mono text-xs px-3.5 py-2.5 rounded-lg shadow-sm transition-all flex items-center space-x-1 cursor-pointer">
             <span>✨</span>
             <span>Copy Gemini Prompt</span>
           </button>
@@ -47,12 +76,14 @@ export default function DashboardPage() {
           </label>
           <select
             value={activeClient?.id || ''}
-            onChange={(e) => setActiveClient(e.target.value)}
+            onChange={(e) => handleClientChange(e.target.value)}
             className="w-full bg-white border border-[#DCE5EF] rounded-lg px-3 py-2 text-xs font-bold text-[#0B1F3A] focus:outline-none focus:border-[#D99614]"
           >
-            <option value="a1b2c3d4-e5f6-7890-abcd-ef1234567890">ABC Motors (Uncertified)</option>
-            <option value="bf93fef0-fc60-4119-8ea2-68a274984355">Apex Dental Group (Certified)</option>
-            <option value="c2d3e4f5-a6b7-8901-bcde-f23456789012">Kelly Hyundai (Certified)</option>
+            {availableClients.map((client) => (
+              <option key={client.id} value={client.id}>
+                {client.name} ({client.is_certified ? 'Certified' : 'Uncertified'})
+              </option>
+            ))}
           </select>
         </div>
 
