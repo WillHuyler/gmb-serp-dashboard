@@ -4,6 +4,8 @@ import React from 'react';
 import { useClient } from '../lib/client-context';
 import PlaidInsightsPanel from '../components/beacon/PlaidInsightsPanel';
 import TerritoryPerformance from '../components/analytics/TerritoryPerformance';
+import KeywordsTable from '../components/analytics/KeywordsTable';
+import VisibilityChart from '../components/analytics/VisibilityChart';
 
 export default function DashboardPage() {
   const { activeClient, setActiveClient } = useClient();
@@ -122,7 +124,7 @@ export default function DashboardPage() {
 
       {/* 3. MAIN WORKSPACE GRID WITH PLAID AI PANEL */}
       <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
-        {/* LEFT 3 COLUMNS: KPI & CHARTS */}
+        {/* LEFT 3 COLUMNS: KPI, CHARTS & TABLES */}
         <div className="lg:col-span-3 space-y-6">
           {/* SEMANTIC TINTED KPI CARDS */}
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
@@ -171,22 +173,14 @@ export default function DashboardPage() {
             </div>
           </div>
 
-          {/* SERVICE TERRITORY VISUAL MAP & VISIBILITY TREND */}
+          {/* SERVICE TERRITORY MAP & VISIBILITY TREND */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <TerritoryPerformance />
-
-            <div className="bg-white border border-[#DCE5EF] rounded-xl p-5 space-y-4 shadow-sm">
-              <div className="flex justify-between items-center">
-                <h3 className="text-xs font-bold font-mono text-[#0B1F3A] uppercase tracking-wider">
-                  Local Visibility Trend
-                </h3>
-                <span className="text-[10px] font-mono text-slate-400">Last 90 Days</span>
-              </div>
-              <div className="h-56 bg-[#F4F7FB] border border-[#DCE5EF] rounded-lg flex items-center justify-center font-mono text-xs text-slate-400">
-                [ Time-Series Chart Component: ZIP 53202 / 53211 / 53217 ]
-              </div>
-            </div>
+            <VisibilityChart />
           </div>
+
+          {/* KEYWORDS & ROW-LEVEL COMPETITORS TABLE */}
+          <KeywordsTable />
         </div>
 
         {/* RIGHT COLUMN: PLAID AI INSIGHTS RAIL */}
