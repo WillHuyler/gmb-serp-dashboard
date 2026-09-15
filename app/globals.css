@@ -1,41 +1,30 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
-
-@layer base {
-  body {
-    @apply bg-[#F8FAFC] text-[#102033];
-  }
+/* app/globals.css */
+:root {
+  --pl-navy-950: #071426;
+  --pl-navy-900: #0B1F3A;
+  --pl-navy-800: #142E52;
+  --pl-navy-700: #1E3E6B;
+  
+  --pl-gold-500: #D99614;
+  --pl-gold-600: #B97A08;
+  
+  --pl-canvas: #F4F7FB;
+  --pl-surface: #FFFFFF;
+  --pl-border: #DCE5EF;
+  
+  --pl-text-primary: #0B1F3A;
+  --pl-text-secondary: #53657D;
+  --pl-text-muted: #7C8DA5;
+  
+  --pl-success: #12A36D;
+  --pl-info: #1478F2;
+  --pl-purple: #7257E8;
+  --pl-orange: #F58A24;
+  --pl-danger: #E64B4B;
 }
 
-@media print {
-  body {
-    background-color: #ffffff !important;
-    color: #000000 !important;
-  }
-
-  .print\:hidden {
-    display: none !important;
-  }
-
-  .print\:border-black {
-    border-color: #000000 !important;
-  }
-
-  .print\:bg-white {
-    background-color: #ffffff !important;
-  }
-
-  .print\:text-black {
-    color: #000000 !important;
-  }
-
-  .print\:p-0 {
-    padding: 0 !important;
-  }
-
-  @page {
-    margin: 1.5cm;
-    size: A4 landscape;
-  }
+body {
+  background-color: var(--pl-canvas);
+  color: var(--pl-text-primary);
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
 }
