@@ -63,7 +63,6 @@ export default function OutcomeLabPage() {
             </p>
           </div>
 
-          {/* READINESS CHECKLIST */}
           <div className="bg-[#F4F7FB] border border-[#DCE5EF] rounded-lg p-4 max-w-md mx-auto text-left font-mono text-xs space-y-2">
             <div className="flex items-center space-x-2 text-[#12A36D]">
               <span>✓</span>
@@ -87,7 +86,6 @@ export default function OutcomeLabPage() {
           </button>
         </div>
       ) : (
-        /* CERTIFIED WORKSPACE DISPLAY */
         <div className="bg-white border border-[#DCE5EF] rounded-xl p-6 space-y-6 shadow-sm">
           <div className="flex justify-between items-center border-b border-[#DCE5EF] pb-4">
             <div className="space-y-1">
@@ -112,5 +110,4 @@ export default function OutcomeLabPage() {
       )}
     </div>
   );
-}
 }
