@@ -10,21 +10,28 @@ import VisibilityChart from '../components/analytics/VisibilityChart';
 export default function DashboardPage() {
   const { activeClient, setActiveClient } = useClient();
 
+  // Aligned with lib/client-context.tsx default objects
   const availableClients = [
     {
       id: 'a1b2c3d4-e5f6-7890-abcd-ef1234567890',
+      name: 'ABC Motors',
+      tenant_id: '00000000-0000-0000-0000-000000000001',
+      is_certified: false,
+    },
+    {
+      id: 'bf93fef0-fc60-4119-8ea2-68a274984355',
       name: 'High Rise Chimney Sweep & Service',
       tenant_id: '00000000-0000-0000-0000-000000000001',
       is_certified: true,
     },
     {
-      id: 'bf93fef0-fc60-4119-8ea2-68a274984355',
+      id: 'c2d3e4f5-a6b7-8901-bcde-f23456789012',
       name: 'Apex Dental Group',
       tenant_id: '00000000-0000-0000-0000-000000000001',
       is_certified: true,
     },
     {
-      id: 'c2d3e4f5-a6b7-8901-bcde-f23456789012',
+      id: 'd3e4f5a6-b7c8-9012-cdef-345678901234',
       name: 'Kelly Hyundai',
       tenant_id: '00000000-0000-0000-0000-000000000001',
       is_certified: true,
@@ -40,21 +47,21 @@ export default function DashboardPage() {
 
   return (
     <div className="space-y-6 text-[#0B1F3A]">
-      {/* 1. HEADER SECTION WITH SCRIPT BRAND TEXT */}
+      {/* 1. HEADER SECTION */}
       <div className="flex justify-between items-start">
         <div>
           <span className="text-[10px] font-mono uppercase tracking-widest text-slate-400 font-bold block">
             CLIENT DASHBOARD
           </span>
           <h1 className="text-2xl font-bold tracking-tight text-[#0B1F3A] mt-0.5">
-            {activeClient?.name || 'High Rise Chimney Sweep & Service'}
+            {activeClient?.name || 'ABC Motors'}
           </h1>
           <p className="text-xs text-[#53657D] mt-1">
             Local search intelligence, paid media performance, and growth opportunities — all in one place.
           </p>
         </div>
 
-        {/* SCRIPT WATERMARK & ACTION BUTTONS */}
+        {/* TOP ACTION HIERARCHY */}
         <div className="flex flex-col items-end space-y-3">
           <div className="text-xs font-serif italic text-[#0B1F3A]/70 flex items-center space-x-1">
             <span>Shine a Light on What Works.</span>
@@ -69,7 +76,7 @@ export default function DashboardPage() {
             </button>
             <button className="bg-white border border-[#DCE5EF] hover:bg-[#F4F7FB] text-[#0B1F3A] font-mono text-xs px-3.5 py-2.5 rounded-lg shadow-sm transition-all flex items-center space-x-1 cursor-pointer">
               <span>✨</span>
-              <span>Copy Gemini Prompt</span>
+              <span>Ask Plaid</span>
             </button>
           </div>
         </div>
@@ -88,7 +95,7 @@ export default function DashboardPage() {
           >
             {availableClients.map((client) => (
               <option key={client.id} value={client.id}>
-                {client.name}
+                {client.name} {client.is_certified ? '(Certified)' : '(Uncertified)'}
               </option>
             ))}
           </select>
@@ -129,94 +136,69 @@ export default function DashboardPage() {
 
       {/* 3. MAIN WORKSPACE GRID WITH PLAID AI PANEL */}
       <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
-        {/* LEFT 3 COLUMNS: KPI, CHARTS & TABLES */}
         <div className="lg:col-span-3 space-y-6">
-          {/* SEMANTIC TINTED KPI CARDS WITH SPARK LINES */}
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             <div className="bg-[#EBF3FF] border border-[#DCE5EF] rounded-xl p-4 space-y-2">
               <div className="flex justify-between items-center text-xs text-[#53657D] font-mono font-bold">
                 <span>INTERACTIONS</span>
-                <span className="w-6 h-6 rounded-full bg-blue-500/10 text-[#1478F2] flex items-center justify-center text-xs">
-                  💬
-                </span>
+                <span className="w-6 h-6 rounded-full bg-blue-500/10 text-[#1478F2] flex items-center justify-center text-xs">💬</span>
               </div>
               <div className="text-3xl font-bold text-[#0B1F3A]">68</div>
               <div className="flex justify-between items-end">
                 <div className="text-[11px] font-mono text-[#12A36D] font-bold">
-                  ↑ +75% <div className="text-slate-400 font-normal text-[10px]">vs. MTD vs. Last MTD</div>
+                  ↑ +75% <div className="text-slate-400 font-normal text-[10px]">vs. Last MTD</div>
                 </div>
-                <svg className="w-16 h-6 text-[#1478F2]" viewBox="0 0 50 20" fill="none" stroke="currentColor" strokeWidth="2">
-                  <path d="M0 15 L10 12 L20 16 L30 8 L40 10 L50 2" />
-                </svg>
               </div>
             </div>
 
             <div className="bg-[#EAF8F2] border border-[#DCE5EF] rounded-xl p-4 space-y-2">
               <div className="flex justify-between items-center text-xs text-[#53657D] font-mono font-bold">
                 <span>PHONE CALLS</span>
-                <span className="w-6 h-6 rounded-full bg-emerald-500/10 text-[#12A36D] flex items-center justify-center text-xs">
-                  📞
-                </span>
+                <span className="w-6 h-6 rounded-full bg-emerald-500/10 text-[#12A36D] flex items-center justify-center text-xs">📞</span>
               </div>
               <div className="text-3xl font-bold text-[#0B1F3A]">14</div>
               <div className="flex justify-between items-end">
                 <div className="text-[11px] font-mono text-[#12A36D] font-bold">
-                  ↑ +45% <div className="text-slate-400 font-normal text-[10px]">vs. MTD vs. Last MTD</div>
+                  ↑ +45% <div className="text-slate-400 font-normal text-[10px]">vs. Last MTD</div>
                 </div>
-                <svg className="w-16 h-6 text-[#12A36D]" viewBox="0 0 50 20" fill="none" stroke="currentColor" strokeWidth="2">
-                  <path d="M0 16 L12 14 L24 10 L36 12 L50 4" />
-                </svg>
               </div>
             </div>
 
             <div className="bg-[#F1EEFF] border border-[#DCE5EF] rounded-xl p-4 space-y-2">
               <div className="flex justify-between items-center text-xs text-[#53657D] font-mono font-bold">
                 <span>DIRECTIONS</span>
-                <span className="w-6 h-6 rounded-full bg-purple-500/10 text-[#7257E8] flex items-center justify-center text-xs">
-                  📍
-                </span>
+                <span className="w-6 h-6 rounded-full bg-purple-500/10 text-[#7257E8] flex items-center justify-center text-xs">📍</span>
               </div>
               <div className="text-3xl font-bold text-[#0B1F3A]">18</div>
               <div className="flex justify-between items-end">
                 <div className="text-[11px] font-mono text-[#12A36D] font-bold">
-                  ↑ +33% <div className="text-slate-400 font-normal text-[10px]">vs. MTD vs. Last MTD</div>
+                  ↑ +33% <div className="text-slate-400 font-normal text-[10px]">vs. Last MTD</div>
                 </div>
-                <svg className="w-16 h-6 text-[#7257E8]" viewBox="0 0 50 20" fill="none" stroke="currentColor" strokeWidth="2">
-                  <path d="M0 18 L15 12 L28 15 L40 6 L50 8" />
-                </svg>
               </div>
             </div>
 
             <div className="bg-[#FFF4EB] border border-[#DCE5EF] rounded-xl p-4 space-y-2">
               <div className="flex justify-between items-center text-xs text-[#53657D] font-mono font-bold">
                 <span>WEBSITE CLICKS</span>
-                <span className="w-6 h-6 rounded-full bg-orange-500/10 text-[#F58A24] flex items-center justify-center text-xs">
-                  🖱️
-                </span>
+                <span className="w-6 h-6 rounded-full bg-orange-500/10 text-[#F58A24] flex items-center justify-center text-xs">🖱️</span>
               </div>
               <div className="text-3xl font-bold text-[#0B1F3A]">36</div>
               <div className="flex justify-between items-end">
                 <div className="text-[11px] font-mono text-[#12A36D] font-bold">
-                  ↑ +77% <div className="text-slate-400 font-normal text-[10px]">vs. MTD vs. Last MTD</div>
+                  ↑ +77% <div className="text-slate-400 font-normal text-[10px]">vs. Last MTD</div>
                 </div>
-                <svg className="w-16 h-6 text-[#F58A24]" viewBox="0 0 50 20" fill="none" stroke="currentColor" strokeWidth="2">
-                  <path d="M0 14 L10 16 L25 8 L38 12 L50 2" />
-                </svg>
               </div>
             </div>
           </div>
 
-          {/* SERVICE TERRITORY MAP & VISIBILITY TREND */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <TerritoryPerformance />
             <VisibilityChart />
           </div>
 
-          {/* KEYWORDS & ROW-LEVEL COMPETITORS TABLE */}
           <KeywordsTable />
         </div>
 
-        {/* RIGHT COLUMN: PLAID AI INSIGHTS RAIL */}
         <div className="lg:col-span-1">
           <PlaidInsightsPanel />
         </div>
