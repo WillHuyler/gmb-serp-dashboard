@@ -8,42 +8,7 @@ import KeywordsTable from '../components/analytics/KeywordsTable';
 import VisibilityChart from '../components/analytics/VisibilityChart';
 
 export default function DashboardPage() {
-  const { activeClient, setActiveClient } = useClient();
-
-  // Aligned with lib/client-context.tsx default objects
-  const availableClients = [
-    {
-      id: 'a1b2c3d4-e5f6-7890-abcd-ef1234567890',
-      name: 'ABC Motors',
-      tenant_id: '00000000-0000-0000-0000-000000000001',
-      is_certified: false,
-    },
-    {
-      id: 'bf93fef0-fc60-4119-8ea2-68a274984355',
-      name: 'High Rise Chimney Sweep & Service',
-      tenant_id: '00000000-0000-0000-0000-000000000001',
-      is_certified: true,
-    },
-    {
-      id: 'c2d3e4f5-a6b7-8901-bcde-f23456789012',
-      name: 'Apex Dental Group',
-      tenant_id: '00000000-0000-0000-0000-000000000001',
-      is_certified: true,
-    },
-    {
-      id: 'd3e4f5a6-b7c8-9012-cdef-345678901234',
-      name: 'Kelly Hyundai',
-      tenant_id: '00000000-0000-0000-0000-000000000001',
-      is_certified: true,
-    },
-  ];
-
-  const handleClientChange = (clientId: string) => {
-    const selected = availableClients.find((c) => c.id === clientId);
-    if (selected) {
-      setActiveClient(selected);
-    }
-  };
+  const { activeClient, availableClients, setActiveClientId } = useClient();
 
   return (
     <div className="space-y-6 text-[#0B1F3A]">
@@ -54,14 +19,13 @@ export default function DashboardPage() {
             CLIENT DASHBOARD
           </span>
           <h1 className="text-2xl font-bold tracking-tight text-[#0B1F3A] mt-0.5">
-            {activeClient?.name || 'ABC Motors'}
+            {activeClient?.name || 'Select Client'}
           </h1>
           <p className="text-xs text-[#53657D] mt-1">
             Local search intelligence, paid media performance, and growth opportunities — all in one place.
           </p>
         </div>
 
-        {/* TOP ACTION HIERARCHY */}
         <div className="flex flex-col items-end space-y-3">
           <div className="text-xs font-serif italic text-[#0B1F3A]/70 flex items-center space-x-1">
             <span>Shine a Light on What Works.</span>
@@ -90,7 +54,7 @@ export default function DashboardPage() {
           </label>
           <select
             value={activeClient?.id || ''}
-            onChange={(e) => handleClientChange(e.target.value)}
+            onChange={(e) => setActiveClientId(e.target.value)}
             className="w-full bg-white border border-[#DCE5EF] rounded-lg px-3 py-2 text-xs font-bold text-[#0B1F3A] focus:outline-none focus:border-[#D99614]"
           >
             {availableClients.map((client) => (
@@ -134,7 +98,7 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      {/* 3. MAIN WORKSPACE GRID WITH PLAID AI PANEL */}
+      {/* 3. MAIN WORKSPACE GRID */}
       <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
         <div className="lg:col-span-3 space-y-6">
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
