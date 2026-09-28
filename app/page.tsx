@@ -1,11 +1,11 @@
 'use client';
 
 import React from 'react';
-import { useClient } from '@/lib/client-context';
-import PlaidInsightsPanel from '@/components/beacon/PlaidInsightsPanel';
-import TerritoryPerformance from '@/components/analytics/TerritoryPerformance';
-import KeywordsTable from '@/components/analytics/KeywordsTable';
-import VisibilityChart from '@/components/analytics/VisibilityChart';
+import { useClient } from '../lib/client-context';
+import PlaidInsightsPanel from '../components/beacon/PlaidInsightsPanel';
+import TerritoryPerformance from '../components/analytics/TerritoryPerformance';
+import KeywordsTable from '../components/analytics/KeywordsTable';
+import VisibilityChart from '../components/analytics/VisibilityChart';
 
 export default function DashboardPage() {
   const { activeClient, clients, setActiveClientId } = useClient();
