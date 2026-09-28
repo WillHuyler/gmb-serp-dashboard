@@ -1,37 +1,81 @@
-export interface PitchScenario {
-  targetIncrease: string;
-  targetMetric: string;
-  strategies: {
-    name: string;
-    focus: string;
-    projectedResult: string;
+export interface OutcomeScenario {
+  targetGrowth: string; // e.g., "+10%", "+15%", "+20%", "+25%"
+  modeledLeads: number;
+  projectedRevenue: string;
+  recommendedActions: Array<{
+    channel: string;
+    action: string;
     estimatedCost: string;
-    timeline: string;
-    confidenceLevel: string;
-  }[];
+    impactScore: string;
+  }>;
 }
 
-export const DEMO_PITCH_SCENARIOS: Record<string, PitchScenario> = {
-  'apex-dental': {
-    targetIncrease: '+20%',
-    targetMetric: 'Qualified Leads',
-    strategies: [
+export interface ScenarioResult {
+  status: 'CERTIFIED' | 'PARTIAL' | 'UNCERTIFIED';
+  clientName: string;
+  message?: string;
+  scenarios?: OutcomeScenario[];
+}
+
+/**
+ * Calculates Outcome Lab scenario models only when the active client's baseline is CERTIFIED.
+ * Enforces Fail-Closed behavior for uncertified clients.
+ */
+export function getOutcomeLabScenarios(
+  clientId: string,
+  clientName: string,
+  isCertified: boolean
+): ScenarioResult {
+  if (!isCertified) {
+    return {
+      status: 'UNCERTIFIED',
+      clientName,
+      message: 'MODEL NOT READY — UNCERTIFIED BASELINE. Required API sources (Google Ads, GA4) are unmapped or pending account connection.',
+    };
+  }
+
+  // Certified baseline scenario models
+  return {
+    status: 'CERTIFIED',
+    clientName,
+    scenarios: [
       {
-        name: 'Strategy A — Local Optimization & AI FAQ',
-        focus: 'Most Efficient (Low Spend Add)',
-        projectedResult: '+24 to +28 Qualified Leads / mo',
-        estimatedCost: '+$450 / month',
-        timeline: '2–3 weeks',
-        confidenceLevel: '92% (High Correlation)'
+        targetGrowth: '+10%',
+        modeledLeads: 198,
+        projectedRevenue: '$138,600',
+        recommendedActions: [
+          { channel: 'Google Ads', action: 'Scale High-Intent Local Keywords', estimatedCost: '+$350/mo', impactScore: 'High' },
+          { channel: 'GMB', action: 'Increase Weekly Post Frequency to 3x', estimatedCost: '$0', impactScore: 'Medium' },
+        ],
       },
       {
-        name: 'Strategy B — Google Ads Aggressive Capture',
-        focus: 'Fastest Result Velocity',
-        projectedResult: '+30 to +35 Leads / mo',
-        estimatedCost: '+$1,800 / month',
-        timeline: '5–7 days',
-        confidenceLevel: '78% (Medium Confidence)'
-      }
-    ]
-  }
-};
+        targetGrowth: '+15%',
+        modeledLeads: 207,
+        projectedRevenue: '$144,900',
+        recommendedActions: [
+          { channel: 'Google Ads', action: 'Expand Radius Targeting by +5 Miles', estimatedCost: '+$550/mo', impactScore: 'High' },
+          { channel: 'Meta Ads', action: 'Launch Retargeting Campaign for Website Visitors', estimatedCost: '+$250/mo', impactScore: 'Medium' },
+        ],
+      },
+      {
+        targetGrowth: '+20%',
+        modeledLeads: 216,
+        projectedRevenue: '$151,200',
+        recommendedActions: [
+          { channel: 'Google Ads', action: 'Capture Search Impression Share in ZIP 53211', estimatedCost: '+$750/mo', impactScore: 'Very High' },
+          { channel: 'Reputation', action: 'Trigger Automated Review Request Workflows', estimatedCost: '$0', impactScore: 'High' },
+        ],
+      },
+      {
+        targetGrowth: '+25%',
+        modeledLeads: 225,
+        projectedRevenue: '$157,500',
+        recommendedActions: [
+          { channel: 'Google Ads', action: 'Max Conversions Bidding on Tier 1 Keywords', estimatedCost: '+$1,100/mo', impactScore: 'Very High' },
+          { channel: 'Meta Ads', action: 'Broad Audience Lookalike Campaign', estimatedCost: '+$400/mo', impactScore: 'High' },
+        ],
+      },
+    ],
+  };
+}
+}
