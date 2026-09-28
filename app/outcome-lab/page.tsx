@@ -1,11 +1,12 @@
 'use client';
 
-import React from 'react';
-import { useClient } from '../../lib/client-context';
-import { getOutcomeLabScenarios } from '../../lib/outcome-lab-scenarios';
+import React, { useState } from 'react';
+import { useClient } from '@/lib/client-context';
+import { getOutcomeLabScenarios } from '@/lib/outcome-lab-scenarios';
 
-export default function OutcomeLabPage() {
+export default function OpportunityLabPage() {
   const { activeClient } = useClient();
+  const [activeTab, setActiveTab] = useState<'REVERSE' | 'FORWARD'>('REVERSE');
 
   const scenarioResult = getOutcomeLabScenarios(
     activeClient?.id || '',
@@ -14,33 +15,70 @@ export default function OutcomeLabPage() {
   );
 
   return (
-    <div className="space-y-6 text-[#0B1F3A]">
-      <div>
-        <span className="text-[10px] font-mono uppercase tracking-widest text-slate-400 font-bold block">
-          DECISION MODELING ENGINE
-        </span>
-        <h1 className="text-2xl font-bold tracking-tight text-[#0B1F3A] mt-0.5">
-          Outcome Lab — {activeClient?.name}
-        </h1>
-        <p className="text-xs text-[#53657D] mt-1">
-          Simulate performance outcomes and growth scenarios based on certified client telemetry.
-        </p>
+    <div className="space-y-6 text-[#0B1F3A] p-6">
+      {/* Header & Tab Mode Selector */}
+      <div className="flex justify-between items-start">
+        <div>
+          <span className="text-[10px] font-mono uppercase tracking-widest text-slate-400 font-bold block">
+            OPPORTUNITY LAB
+          </span>
+          <h1 className="text-2xl font-bold tracking-tight text-[#0B1F3A] mt-0.5">
+            Decision Modeling Engine
+          </h1>
+          <p className="text-xs text-[#53657D] mt-1">
+            Model what could happen — or determine what it takes to reach a specific business outcome for{' '}
+            <span className="font-bold text-[#0B1F3A]">{activeClient?.name}</span>.
+          </p>
+        </div>
+
+        {/* Both Sides Toggle Bar */}
+        <div className="flex bg-[#F4F7FB] border border-[#DCE5EF] p-1 rounded-lg space-x-1 font-mono text-xs font-bold">
+          <button
+            onClick={() => setActiveTab('REVERSE')}
+            className={`px-4 py-2 rounded-md transition-all cursor-pointer ${
+              activeTab === 'REVERSE'
+                ? 'bg-[#0B1F3A] text-white shadow-sm'
+                : 'text-[#53657D] hover:text-[#0B1F3A]'
+            }`}
+          >
+            REVERSE OUTCOME TARGETING
+          </button>
+          <button
+            onClick={() => setActiveTab('FORWARD')}
+            className={`px-4 py-2 rounded-md transition-all cursor-pointer ${
+              activeTab === 'FORWARD'
+                ? 'bg-[#0B1F3A] text-white shadow-sm'
+                : 'text-[#53657D] hover:text-[#0B1F3A]'
+            }`}
+          >
+            FORWARD SCENARIO MODELING
+          </button>
+        </div>
       </div>
 
+      {/* Main Viewport */}
       {scenarioResult.status === 'UNCERTIFIED' ? (
-        <div className="bg-[#FFF4EB] border border-[#F58A24]/30 rounded-xl p-8 text-center space-y-3">
-          <div className="w-12 h-12 bg-[#F58A24]/10 text-[#F58A24] rounded-full flex items-center justify-center mx-auto text-xl font-bold">
-            🔒
+        <div className="bg-white border border-[#DCE5EF] rounded-xl p-12 text-center space-y-4 shadow-sm max-w-3xl mx-auto my-8">
+          <div className="w-12 h-12 bg-[#FFF4EB] text-[#F58A24] rounded-full flex items-center justify-center mx-auto text-xl font-bold border border-[#F58A24]/30">
+            ⚠️
           </div>
-          <h2 className="text-sm font-mono font-bold text-[#0B1F3A] uppercase tracking-wide">
+          <h2 className="text-sm font-mono font-bold text-[#0B1F3A] uppercase tracking-wider">
             MODEL NOT READY — UNCERTIFIED BASELINE
           </h2>
-          <p className="text-xs text-[#53657D] max-w-lg mx-auto">
-            {scenarioResult.message}
+          <p className="text-xs text-[#53657D] max-w-md mx-auto leading-relaxed">
+            Pursuant to the Data Trust Constitution, decision modeling requires a 100% certified client baseline.{' '}
+            <span className="font-bold text-[#0B1F3A]">{activeClient?.name}</span> requires provider account mapping and historical validation before deployable recommendations can be calculated.
           </p>
+
+          <div className="bg-[#F4F7FB] border border-[#DCE5EF] rounded-lg p-4 text-left font-mono text-xs space-y-1.5 max-w-md mx-auto">
+            <div className="text-[#12A36D] font-bold">✓ Client Context Selected</div>
+            <div className="text-[#E64B4B]">✕ Account Mapping Certified (Pending Review)</div>
+            <div className="text-[#E64B4B]">✕ Google Ads / GA4 Baseline Ingested</div>
+          </div>
+
           <div className="pt-2">
-            <button className="bg-white border border-[#DCE5EF] text-[#0B1F3A] text-xs font-mono font-bold px-4 py-2 rounded-lg shadow-sm hover:bg-[#F4F7FB]">
-              Configure Account Mappings in Settings
+            <button className="bg-slate-200 text-slate-500 text-xs font-mono font-bold px-6 py-2.5 rounded-lg cursor-not-allowed uppercase tracking-wider">
+              DEPLOYMENT DISABLED — REQUIRES CERTIFICATION
             </button>
           </div>
         </div>
