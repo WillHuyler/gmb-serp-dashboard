@@ -55,6 +55,7 @@ export const CANONICAL_CLIENTS: Client[] = [
 interface ClientContextType {
   activeClient: Client | null;
   availableClients: Client[];
+  clients: Client[]; // Alias for backward compatibility with GlobalHeader
   setActiveClient: (client: Client) => void;
   setActiveClientId: (id: string) => void;
   isLoading: boolean;
@@ -67,7 +68,7 @@ export function ClientProvider({ children }: { children: ReactNode }) {
   const [isLoading, setIsLoading] = useState<boolean>(false);
 
   useEffect(() => {
-    // Sync with localStorage or URL params if available on client load
+    // Sync with localStorage if available on client load
     const savedClientId = typeof window !== 'undefined' ? localStorage.getItem('porchlight_active_client_id') : null;
     if (savedClientId) {
       const match = CANONICAL_CLIENTS.find((c) => c.id === savedClientId);
@@ -98,6 +99,7 @@ export function ClientProvider({ children }: { children: ReactNode }) {
       value={{
         activeClient,
         availableClients: CANONICAL_CLIENTS,
+        clients: CANONICAL_CLIENTS,
         setActiveClient,
         setActiveClientId,
         isLoading,
