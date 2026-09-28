@@ -6,7 +6,6 @@ import { useClient } from '../../lib/client-context';
 export default function TerritoryPerformance() {
   const { activeClient } = useClient();
 
-  // Client-specific ZIP performance mappings
   const clientTerritories: Record<string, Array<{ zip: string; rank: string; change: string }>> = {
     'a1b2c3d4-e5f6-7890-abcd-ef1234567890': [ // ABC Motors
       { zip: '53202', rank: '#3', change: '+2' },
