@@ -19,7 +19,7 @@ export interface Client {
   };
 }
 
-// Canonical Client Registry — Certified Roster
+// Canonical Client Registry
 export const CANONICAL_CLIENTS: Client[] = [
   {
     id: 'a1b2c3d4-e5f6-7890-abcd-ef1234567890',
@@ -75,7 +75,7 @@ export const CANONICAL_CLIENTS: Client[] = [
 interface ClientContextType {
   activeClient: Client | null;
   availableClients: Client[];
-  clients: Client[];
+  clients: Client[]; // Alias for backward compatibility
   setActiveClient: (client: Client) => void;
   setActiveClientId: (id: string) => void;
   isLoading: boolean;
