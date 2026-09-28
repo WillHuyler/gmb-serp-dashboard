@@ -1,14 +1,14 @@
 'use client';
 
 import React from 'react';
-import { useClient } from '../../lib/client-context';
+import { useClient } from '@/lib/client-context';
 
 export default function GlobalHeader() {
   const { activeClient, clients, setActiveClientId } = useClient();
 
   return (
     <header className="h-16 bg-white border-b border-[#DCE5EF] px-6 flex items-center justify-between sticky top-0 z-40">
-      {/* Search & Client Switcher */}
+      {/* Search & Client Switcher Bar */}
       <div className="flex items-center space-x-4 flex-1 max-w-2xl">
         <div className="relative w-64">
           <select
@@ -34,7 +34,7 @@ export default function GlobalHeader() {
         </div>
       </div>
 
-      {/* Date Range & User Context */}
+      {/* Date Range & Admin Profile */}
       <div className="flex items-center space-x-4">
         <div className="bg-[#F4F7FB] border border-[#DCE5EF] rounded-lg px-3 py-1.5 text-xs font-mono font-bold text-[#0B1F3A] flex items-center space-x-2">
           <span>📅 Jun 1, 2026 – Aug 27, 2026</span>
