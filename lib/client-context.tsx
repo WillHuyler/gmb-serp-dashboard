@@ -13,6 +13,9 @@ export interface Client {
     ga4_property_id?: string;
     gsc_site_url?: string;
     meta_act_id?: string;
+    bing_webmaster_site_url?: string; // Bing Webmaster Tools
+    clarity_project_id?: string;      // Microsoft Clarity
+    brightlocal_location_id?: string;
   };
 }
 
@@ -25,6 +28,7 @@ export const CANONICAL_CLIENTS: Client[] = [
     is_certified: false,
     mappings: {
       gmb_account_id: 'gmb_abc_motors_01',
+      brightlocal_location_id: 'bl_abc_motors_01',
     },
   },
   {
@@ -36,6 +40,8 @@ export const CANONICAL_CLIENTS: Client[] = [
       gmb_account_id: 'gmb_highrise_01',
       google_ads_id: 'ads_highrise_9821',
       ga4_property_id: 'ga4_highrise_3311',
+      bing_webmaster_site_url: 'https://highrisechimney.com',
+      clarity_project_id: 'ms_clarity_hr_881',
     },
   },
   {
@@ -43,19 +49,27 @@ export const CANONICAL_CLIENTS: Client[] = [
     tenant_id: '00000000-0000-0000-0000-000000000001',
     name: 'Apex Dental Group',
     is_certified: true,
+    mappings: {
+      gmb_account_id: 'gmb_apexdental_01',
+      ga4_property_id: 'ga4_apexdental_1029',
+    },
   },
   {
     id: 'd3e4f5a6-b7c8-9012-cdef-345678901234',
     tenant_id: '00000000-0000-0000-0000-000000000001',
     name: 'Kelly Hyundai',
     is_certified: true,
+    mappings: {
+      gmb_account_id: 'gmb_kellyhyundai_01',
+      google_ads_id: 'ads_kellyhyundai_4412',
+    },
   },
 ];
 
 interface ClientContextType {
   activeClient: Client | null;
   availableClients: Client[];
-  clients: Client[]; // Alias for backward compatibility with GlobalHeader
+  clients: Client[]; // Alias for backward compatibility across header/nav components
   setActiveClient: (client: Client) => void;
   setActiveClientId: (id: string) => void;
   isLoading: boolean;
