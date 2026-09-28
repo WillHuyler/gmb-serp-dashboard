@@ -1,8 +1,8 @@
 'use client';
 
 import React, { useState } from 'react';
-import { useClient } from '@/lib/client-context';
-import { getOutcomeLabScenarios } from '@/lib/outcome-lab-scenarios';
+import { useClient } from '../../lib/client-context';
+import { getOutcomeLabScenarios } from '../../lib/outcome-lab-scenarios';
 
 export default function OpportunityLabPage() {
   const { activeClient } = useClient();
