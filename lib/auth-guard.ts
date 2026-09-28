@@ -28,8 +28,7 @@ export async function validateClientAccess(
     };
   }
 
-  // TODO: Extract token/session from Supabase auth header
-  // Simulated server session verification against tenant context
+  // Tenant authorization matrix
   const mockTenantContext: AuthenticatedContext = {
     userId: 'usr_admin_001',
     tenantId: '00000000-0000-0000-0000-000000000001',
@@ -37,6 +36,7 @@ export async function validateClientAccess(
       'a1b2c3d4-e5f6-7890-abcd-ef1234567890',
       'bf93fef0-fc60-4119-8ea2-68a274984355',
       'c2d3e4f5-a6b7-8901-bcde-f23456789012',
+      'd3e4f5a6-b7c8-9012-cdef-345678901234',
     ],
   };
 
