@@ -19,7 +19,7 @@ export interface Client {
   };
 }
 
-// Canonical Roster
+// Canonical Client Registry — Certified Roster
 export const CANONICAL_CLIENTS: Client[] = [
   {
     id: 'a1b2c3d4-e5f6-7890-abcd-ef1234567890',
@@ -68,25 +68,6 @@ export const CANONICAL_CLIENTS: Client[] = [
       google_ads_id: 'ads_kellyhyundai_4412',
       ga4_property_id: 'ga4_kellyhyundai_9012',
       bing_webmaster_site_url: 'https://kellyhyundai.com',
-    },
-  },
-  {
-    id: 'e4f5a6b7-c8d9-0123-def0-456789012345',
-    tenant_id: '00000000-0000-0000-0000-000000000001',
-    name: 'Brentmark Roofing & Solar',
-    is_certified: true,
-    mappings: {
-      gmb_account_id: 'gmb_brentmark_01',
-      google_ads_id: 'ads_brentmark_5510',
-    },
-  },
-  {
-    id: 'f5a6b7c8-d9e0-1234-ef01-567890123456',
-    tenant_id: '00000000-0000-0000-0000-000000000001',
-    name: 'Abbey Door & Window',
-    is_certified: true,
-    mappings: {
-      gmb_account_id: 'gmb_abbeydoor_01',
     },
   },
 ];
