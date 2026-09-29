@@ -6,6 +6,13 @@ export interface AuthContext {
   authorizedClientIds: string[];
 }
 
+export interface AuthValidationResult {
+  authorized: boolean;
+  context?: AuthContext;
+  errorResponse?: NextResponse;
+  response?: NextResponse; // Alias for backward compatibility across route handlers
+}
+
 /**
  * Validates server-side tenant and client authorization.
  * Blocks cross-tenant data access attempts.
@@ -13,8 +20,7 @@ export interface AuthContext {
 export async function validateClientAccess(
   req: NextRequest,
   requestedClientId?: string
-): Promise<{ authorized: boolean; context?: AuthContext; errorResponse?: NextResponse }> {
-  // Hardcoded tenant boundary for current production tenant
+): Promise<AuthValidationResult> {
   const mockSessionContext: AuthContext = {
     tenantId: '00000000-0000-0000-0000-000000000001',
     userId: 'usr_will_huyler_admin',
@@ -27,22 +33,25 @@ export async function validateClientAccess(
   };
 
   if (requestedClientId && !mockSessionContext.authorizedClientIds.includes(requestedClientId)) {
+    const errResponse = NextResponse.json(
+      {
+        success: false,
+        error: {
+          code: 'FORBIDDEN_TENANT_ACCESS',
+          message: 'User is not authorized to access data for the requested client.',
+        },
+        meta: {
+          timestamp: new Date().toISOString(),
+          requestedClientId,
+        },
+      },
+      { status: 403 }
+    );
+
     return {
       authorized: false,
-      errorResponse: NextResponse.json(
-        {
-          success: false,
-          error: {
-            code: 'FORBIDDEN_TENANT_ACCESS',
-            message: 'User is not authorized to access data for the requested client.',
-          },
-          meta: {
-            timestamp: new Date().toISOString(),
-            requestedClientId,
-          },
-        },
-        { status: 403 }
-      ),
+      errorResponse,
+      response: errResponse, // Supports both aliases
     };
   }
 
