@@ -50,7 +50,7 @@ export async function validateClientAccess(
 
     return {
       authorized: false,
-      errorResponse,
+      errorResponse: errResponse,
       response: errResponse, // Supports both aliases
     };
   }
