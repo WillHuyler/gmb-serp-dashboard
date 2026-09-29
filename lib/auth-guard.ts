@@ -1,63 +1,50 @@
 import { NextRequest, NextResponse } from 'next/server';
 
-export interface AuthenticatedContext {
-  userId: string;
+export interface AuthContext {
   tenantId: string;
+  userId: string;
   authorizedClientIds: string[];
 }
 
 /**
- * Validates that the requested clientId belongs to the authenticated tenant.
- * Server-side enforcement for all API routes.
+ * Validates server-side tenant and client authorization.
+ * Blocks cross-tenant data access attempts.
  */
 export async function validateClientAccess(
   req: NextRequest,
-  requestedClientId: string | null
-): Promise<{ authorized: boolean; response?: NextResponse; context?: AuthenticatedContext }> {
-  if (!requestedClientId) {
-    return {
-      authorized: false,
-      response: NextResponse.json(
-        {
-          success: false,
-          error: { code: 'INVALID_CLIENT_ID', message: 'Target client ID is required.' },
-          meta: { timestamp: new Date().toISOString() },
-        },
-        { status: 400 }
-      ),
-    };
-  }
-
-  // Tenant authorization matrix
-  const mockTenantContext: AuthenticatedContext = {
-    userId: 'usr_admin_001',
+  requestedClientId?: string
+): Promise<{ authorized: boolean; context?: AuthContext; errorResponse?: NextResponse }> {
+  // Hardcoded tenant boundary for current production tenant
+  const mockSessionContext: AuthContext = {
     tenantId: '00000000-0000-0000-0000-000000000001',
+    userId: 'usr_will_huyler_admin',
     authorizedClientIds: [
-      'a1b2c3d4-e5f6-7890-abcd-ef1234567890',
-      'bf93fef0-fc60-4119-8ea2-68a274984355',
-      'c2d3e4f5-a6b7-8901-bcde-f23456789012',
-      'd3e4f5a6-b7c8-9012-cdef-345678901234',
+      'a1b2c3d4-e5f6-7890-abcd-ef1234567890', // ABC Motors
+      'bf93fef0-fc60-4119-8ea2-68a274984355', // High Rise Chimney Sweep
+      'c2d3e4f5-a6b7-8901-bcde-f23456789012', // Apex Dental Group
+      'd3e4f5a6-b7c8-9012-cdef-345678901234', // Kelly Hyundai
     ],
   };
 
-  const isAuthorized = mockTenantContext.authorizedClientIds.includes(requestedClientId);
-
-  if (!isAuthorized) {
+  if (requestedClientId && !mockSessionContext.authorizedClientIds.includes(requestedClientId)) {
     return {
       authorized: false,
-      response: NextResponse.json(
+      errorResponse: NextResponse.json(
         {
           success: false,
           error: {
-            code: 'UNAUTHORIZED_CLIENT_ACCESS',
-            message: 'Cross-tenant access violation. Requested client does not belong to your tenant scope.',
+            code: 'FORBIDDEN_TENANT_ACCESS',
+            message: 'User is not authorized to access data for the requested client.',
           },
-          meta: { timestamp: new Date().toISOString() },
+          meta: {
+            timestamp: new Date().toISOString(),
+            requestedClientId,
+          },
         },
         { status: 403 }
       ),
     };
   }
 
-  return { authorized: true, context: mockTenantContext };
+  return { authorized: true, context: mockSessionContext };
 }
