@@ -1,114 +1,112 @@
-"use client";
+'use client';
 
-import React, { createContext, useContext, useState, useEffect, ReactNode } from "react";
-import { useRouter, useSearchParams, usePathname } from "next/navigation";
-import { createClientComponentClient } from "@supabase/auth-helpers-nextjs";
+import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import { useRouter, useSearchParams, usePathname } from 'next/navigation';
+import { createClient } from '@supabase/supabase-js';
 
-export type ClientType = "REAL" | "TEST" | "INACTIVE";
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
+const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
+const supabase = createClient(supabaseUrl, supabaseAnonKey);
+
+export type ClientType = 'REAL' | 'TEST' | 'INACTIVE';
 
 export interface ClientRecord {
   id: string;
+  tenant_id: string;
   name: string;
-  market_location?: string;
-  status: "active" | "inactive";
-  type: ClientType;
-  created_at?: string;
+  domain?: string;
+  is_certified?: boolean;
+  type?: ClientType;
+  mappings?: Record<string, any>;
 }
 
 interface ClientContextType {
   activeClient: ClientRecord | null;
   clients: ClientRecord[];
+  availableClients: ClientRecord[];
+  setActiveClient: (client: ClientRecord) => void;
+  setActiveClientId: (id: string) => void;
   isLoading: boolean;
   error: string | null;
-  setActiveClientById: (clientId: string) => void;
-  refetchClients: () => Promise<void>;
 }
 
-const ClientContext = createContext<ClientContextType | undefined>(undefined);
-
-const STORAGE_KEY = "porchlight_active_client_id";
+const ClientContext = createContext<ClientContextType>({
+  activeClient: null,
+  clients: [],
+  availableClients: [],
+  setActiveClient: () => {},
+  setActiveClientId: () => {},
+  isLoading: true,
+  error: null,
+});
 
 export function ClientProvider({ children }: { children: ReactNode }) {
-  const [clients, setClients] = useState<ClientRecord[]>([]);
-  const [activeClient, setActiveClient] = useState<ClientRecord | null>(null);
-  const [isLoading, setIsLoading] = useState<boolean>(true);
-  const [error, setError] = useState<string | null>(null);
-
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
-  const supabase = createClientComponentClient();
 
-  const fetchClients = async () => {
-    setIsLoading(true);
-    setError(null);
-    try {
-      const { data, error: dbError } = await supabase
-        .from("clients")
-        .select("id, name, market_location, status, type")
-        .order("name", { ascending: true });
+  const [clients, setClients] = useState<ClientRecord[]>([]);
+  const [activeClient, setActiveClientState] = useState<ClientRecord | null>(null);
+  const [isLoading, setIsLoading] = useState<boolean>(true);
+  const [error, setError] = useState<string | null>(null);
 
-      if (dbError) throw dbError;
+  useEffect(() => {
+    async function loadClients() {
+      try {
+        setIsLoading(true);
+        const res = await fetch('/api/clients');
+        const data = await res.json();
 
-      if (data && data.length > 0) {
-        const formattedClients: ClientRecord[] = data.map((c) => ({
-          id: c.id,
-          name: c.name,
-          market_location: c.market_location || "Unspecified Market",
-          status: c.status || "active",
-          type: (c.type as ClientType) || (c.name.toLowerCase().includes("test") ? "TEST" : "REAL"),
-        }));
+        if (data.success && Array.isArray(data.clients) && data.clients.length > 0) {
+          setClients(data.clients);
 
-        setClients(formattedClients);
+          const urlClientId =
+            searchParams?.get('clientId') ||
+            (typeof window !== 'undefined' ? localStorage.getItem('porchlight_active_client_id') : null);
 
-        // Client Resolution Priority: 1. URL Param -> 2. LocalStorage -> 3. First Active Real Client
-        const urlClientId = searchParams.get("client_id");
-        const storedClientId = typeof window !== "undefined" ? localStorage.getItem(STORAGE_KEY) : null;
+          const matched = data.clients.find((c: ClientRecord) => c.id === urlClientId);
+          if (matched) {
+            setActiveClientState(matched);
+          } else {
+            setActiveClientState(data.clients[0]);
+          }
+        } else {
+          // Fallback direct query via Supabase JS client
+          const { data: dbClients, error: dbError } = await supabase
+            .from('clients')
+            .select('*')
+            .order('name', { ascending: true });
 
-        const targetClient =
-          formattedClients.find((c) => c.id === urlClientId) ||
-          formattedClients.find((c) => c.id === storedClientId) ||
-          formattedClients.find((c) => c.type === "REAL" && c.status === "active") ||
-          formattedClients[0];
+          if (dbError) throw dbError;
 
-        if (targetClient) {
-          setActiveClient(targetClient);
-          if (typeof window !== "undefined") {
-            localStorage.setItem(STORAGE_KEY, targetClient.id);
+          if (dbClients && dbClients.length > 0) {
+            setClients(dbClients);
+            setActiveClientState(dbClients[0]);
           }
         }
-      } else {
-        setClients([]);
-        setActiveClient(null);
+      } catch (err: any) {
+        console.error('Failed to load clients in ClientProvider:', err);
+        setError(err.message || 'Failed to initialize client context');
+      } finally {
+        setIsLoading(false);
       }
-    } catch (err: any) {
-      console.error("Failed to load client registry:", err);
-      setError(err.message || "Failed to load clients from authoritative source.");
-    } finally {
-      setIsLoading(false);
+    }
+
+    loadClients();
+  }, [searchParams]);
+
+  const setActiveClient = (client: ClientRecord) => {
+    setActiveClientState(client);
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('porchlight_active_client_id', client.id);
     }
   };
 
-  useEffect(() => {
-    fetchClients();
-  }, []);
-
-  const setActiveClientById = (clientId: string) => {
-    const selected = clients.find((c) => c.id === clientId);
-    if (!selected) return;
-
-    // Purge module cache buffers to prevent cross-tenant data leaks
-    if (typeof window !== "undefined") {
-      sessionStorage.clear();
-      localStorage.setItem(STORAGE_KEY, selected.id);
+  const setActiveClientId = (id: string) => {
+    const match = clients.find((c) => c.id === id);
+    if (match) {
+      setActiveClient(match);
     }
-
-    setActiveClient(selected);
-
-    // Update URL query parameters synchronously
-    const params = new URLSearchParams(searchParams.toString());
-    params.set("client_id", selected.id);
-    router.push(`${pathname}?${params.toString()}`);
   };
 
   return (
@@ -116,10 +114,11 @@ export function ClientProvider({ children }: { children: ReactNode }) {
       value={{
         activeClient,
         clients,
+        availableClients: clients,
+        setActiveClient,
+        setActiveClientId,
         isLoading,
         error,
-        setActiveClientById,
-        refetchClients: fetchClients,
       }}
     >
       {children}
@@ -130,7 +129,7 @@ export function ClientProvider({ children }: { children: ReactNode }) {
 export function useClient() {
   const context = useContext(ClientContext);
   if (!context) {
-    throw new Error("useClient must be used within a ClientProvider");
+    throw new Error('useClient must be used within a ClientProvider');
   }
   return context;
 }
