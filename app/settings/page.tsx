@@ -1,41 +1,53 @@
-"use client";
+'use client';
 
-import React from "react";
-import { useClient } from "@/components/providers/client-provider";
+import React from 'react';
+import { useClient } from '../../lib/client-context';
 
 export default function SettingsPage() {
   const { activeClient } = useClient();
 
   return (
-    <div className="p-6 space-y-6 max-w-4xl mx-auto">
-      <div className="border-b border-slate-800 pb-4">
-        <h1 className="text-xl font-bold text-slate-100 tracking-tight">Client Settings & Governance</h1>
-        <p className="text-xs text-slate-400 mt-1">
-          Configuring profile for: <span className="text-cyan-400 font-medium">{activeClient?.name || "No Client Selected"}</span>
-        </p>
+    <div className="space-y-6 text-[#0B1F3A]">
+      <div className="flex justify-between items-start">
+        <div>
+          <span className="text-[10px] font-mono uppercase tracking-widest text-slate-400 font-bold block">
+            PLATFORM SETTINGS
+          </span>
+          <h1 className="text-2xl font-bold tracking-tight text-[#0B1F3A] mt-0.5">
+            {activeClient?.name || 'Active Client'}
+          </h1>
+          <p className="text-xs text-[#53657D] mt-1">
+            Organization details, client assignments, entitlements, and security controls.
+          </p>
+        </div>
       </div>
 
-      <div className="bg-slate-900 border border-slate-800 rounded-md p-5 space-y-4">
-        <h3 className="text-sm font-semibold text-slate-200">Client Profile Configuration</h3>
-        
-        <div className="grid grid-cols-1 gap-4 text-xs">
-          <div>
-            <label className="block text-slate-400 mb-1">Client Name</label>
-            <input
-              type="text"
-              readOnly
-              value={activeClient?.name || ""}
-              className="w-full bg-slate-950 border border-slate-800 rounded px-3 py-2 text-slate-300 focus:outline-none"
-            />
+      <div className="bg-white border border-[#DCE5EF] rounded-xl p-8 space-y-6 shadow-sm max-w-3xl">
+        <div className="border-b border-[#DCE5EF] pb-4">
+          <h3 className="text-sm font-bold text-[#0B1F3A]">Client Context Settings</h3>
+          <p className="text-xs text-[#53657D] mt-0.5">
+            Current active context and database tenant configuration.
+          </p>
+        </div>
+
+        <div className="space-y-4 font-mono text-xs">
+          <div className="flex justify-between items-center py-2 border-b border-[#DCE5EF]">
+            <span className="text-slate-400">ACTIVE CLIENT:</span>
+            <span className="font-bold text-[#0B1F3A]">{activeClient?.name || 'None Selected'}</span>
           </div>
-          <div>
-            <label className="block text-slate-400 mb-1">Market / Primary Location</label>
-            <input
-              type="text"
-              readOnly
-              value={activeClient?.market_location || ""}
-              className="w-full bg-slate-950 border border-slate-800 rounded px-3 py-2 text-slate-300 focus:outline-none"
-            />
+          <div className="flex justify-between items-center py-2 border-b border-[#DCE5EF]">
+            <span className="text-slate-400">CLIENT ID:</span>
+            <span className="text-[#53657D]">{activeClient?.id || 'N/A'}</span>
+          </div>
+          <div className="flex justify-between items-center py-2 border-b border-[#DCE5EF]">
+            <span className="text-slate-400">TENANT ID:</span>
+            <span className="text-[#53657D]">{activeClient?.tenant_id || '00000000-0000-0000-0000-000000000001'}</span>
+          </div>
+          <div className="flex justify-between items-center py-2 border-b border-[#DCE5EF]">
+            <span className="text-slate-400">CERTIFICATION STATUS:</span>
+            <span className={`font-bold ${activeClient?.is_certified ? 'text-[#12A36D]' : 'text-amber-600'}`}>
+              {activeClient?.is_certified ? '✓ CERTIFIED' : '⚠ UNCERTIFIED'}
+            </span>
           </div>
         </div>
       </div>
