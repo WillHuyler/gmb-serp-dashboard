@@ -3,43 +3,32 @@ import { validateClientAccess } from '../../../../lib/auth-guard';
 
 export async function POST(req: NextRequest) {
   try {
-    const body = await req.json();
-    const { clientId } = body;
+    const body = await req.json().catch(() => ({}));
+    const clientId = body?.clientId || req.nextUrl.searchParams.get('clientId') || undefined;
 
-    // Server-side tenant authorization gate
     const authCheck = await validateClientAccess(req, clientId);
     if (!authCheck.authorized) {
-      return authCheck.response!;
+      return authCheck.errorResponse || authCheck.response || NextResponse.json({ error: 'FORBIDDEN' }, { status: 403 });
     }
 
-    // Process strategy generation for authorized client
+    const { context } = authCheck;
+
     return NextResponse.json({
       success: true,
-      data: {
-        strategyId: `strat_${Date.now()}`,
-        clientId,
-        status: 'GENERATED',
-        recommendations: [
-          {
-            type: 'LOCAL_ORGANIC_VELOCITY',
-            action: 'Accelerate local organic signal velocity by +21.0%',
-            targetGap: '18 lead gap',
-            spendImpact: '$0/mo additional spend',
-          },
-        ],
-      },
-      meta: {
-        timestamp: new Date().toISOString(),
-        tenantId: authCheck.context?.tenantId,
-      },
+      tenantId: context?.tenantId,
+      clientId,
+      strategies: [
+        {
+          id: 'strat_01',
+          type: 'SERP_ACCELERATION',
+          title: 'Local Map Pack Geo-Grid Expansion',
+          impact: '+18% Top-3 Visibility',
+        },
+      ],
     });
-  } catch (error) {
+  } catch (err: any) {
     return NextResponse.json(
-      {
-        success: false,
-        error: { code: 'INTERNAL_ERROR', message: 'Failed to process strategy request.' },
-        meta: { timestamp: new Date().toISOString() },
-      },
+      { success: false, error: 'STRATEGY_GENERATION_FAILED', message: err.message },
       { status: 500 }
     );
   }
