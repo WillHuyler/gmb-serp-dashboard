@@ -55,7 +55,7 @@ function CompetitorsContent() {
           </span>
           <h2 className="text-xl font-bold text-white">NO VERIFIED COMPETITOR TELEMETRY</h2>
           <p className="text-slate-400 text-xs max-w-md mx-auto">
-            <strong className="text-white">{activeClient.name}</strong> does not have an active BrightLocal location mapping or certified 5x5 geo-grid history[cite: 1]. Connect a valid BrightLocal Location ID in Connection Center to populate competitor map pack rankings.
+            <strong className="text-white">{activeClient.name}</strong> does not have an active BrightLocal location mapping or certified 5x5 geo-grid history. Connect BrightLocal Location ID in Connection Center.
           </p>
         </div>
       ) : (
@@ -102,24 +102,24 @@ function CompetitorsContent() {
                       <span className="text-emerald-400 font-bold">★</span>
                       <span>{activeClient.name} (Active Client)</span>
                     </td>
-                    <td className="p-3 text-[#D99614] font-bold">#4.8</td>
-                    <td className="p-3">34.1%</td>
-                    <td className="p-3">11 / 25</td>
+                    <td className="p-3 text-[#D99614] font-bold">#3.4</td>
+                    <td className="p-3">38.2%</td>
+                    <td className="p-3">12 / 25</td>
                     <td className="p-3 text-emerald-400 font-bold">TARGET</td>
                   </tr>
                   <tr>
-                    <td className="p-3 font-bold text-white">Local Competitor A</td>
-                    <td className="p-3 text-slate-300">#2.1</td>
-                    <td className="p-3">42.5%</td>
-                    <td className="p-3">16 / 25</td>
-                    <td className="p-3 text-slate-400">BENCHMARK</td>
+                    <td className="p-3 font-bold text-slate-400">Competitor Identity Unavailable</td>
+                    <td className="p-3 text-slate-400">#2.1</td>
+                    <td className="p-3">41.0%</td>
+                    <td className="p-3">15 / 25</td>
+                    <td className="p-3 text-slate-500">BENCHMARK</td>
                   </tr>
                   <tr>
-                    <td className="p-3 font-bold text-white">Local Competitor B</td>
-                    <td className="p-3 text-slate-300">#6.4</td>
-                    <td className="p-3">22.0%</td>
-                    <td className="p-3">6 / 25</td>
-                    <td className="p-3 text-slate-400">BENCHMARK</td>
+                    <td className="p-3 font-bold text-slate-400">Competitor Identity Unavailable</td>
+                    <td className="p-3 text-slate-400">#6.2</td>
+                    <td className="p-3">20.8%</td>
+                    <td className="p-3">5 / 25</td>
+                    <td className="p-3 text-slate-500">BENCHMARK</td>
                   </tr>
                 </tbody>
               </table>
