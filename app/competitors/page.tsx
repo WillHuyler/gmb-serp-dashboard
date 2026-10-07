@@ -24,7 +24,6 @@ function CompetitorsContent() {
 
   return (
     <main className="flex-1 p-6 max-w-7xl w-full mx-auto space-y-6">
-      {/* Page Header */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>
           <span className="text-[10px] font-mono uppercase tracking-widest text-[#D99614] font-bold block">
@@ -49,7 +48,6 @@ function CompetitorsContent() {
         </div>
       </div>
 
-      {/* Honest Empty State for Unmapped / Uncertified Clients */}
       {!isCertifiedAndMapped ? (
         <div className="p-8 rounded-xl bg-[#111622] border border-[#A9C7E5]/10 text-center space-y-3">
           <span className="text-amber-400 text-xs font-mono tracking-widest uppercase block font-bold">
@@ -57,13 +55,11 @@ function CompetitorsContent() {
           </span>
           <h2 className="text-xl font-bold text-white">NO VERIFIED COMPETITOR TELEMETRY</h2>
           <p className="text-slate-400 text-xs max-w-md mx-auto">
-            <strong className="text-white">{activeClient.name}</strong> does not have an active BrightLocal location mapping or certified 5x5 geo-grid history. Connect a valid BrightLocal Location ID in Connection Center to populate competitor map pack rankings.
+            <strong className="text-white">{activeClient.name}</strong> does not have an active BrightLocal location mapping or certified 5x5 geo-grid history[cite: 1]. Connect a valid BrightLocal Location ID in Connection Center to populate competitor map pack rankings.
           </p>
         </div>
       ) : (
-        /* Live Competitor Surface Derived from SERP Telemetry */
         <div className="space-y-6">
-          {/* Provenance Strip */}
           <div className="bg-[#111622] border border-[#A9C7E5]/10 rounded-xl p-4 grid grid-cols-2 md:grid-cols-4 gap-4 text-xs font-mono">
             <div>
               <span className="text-slate-500 block uppercase text-[10px]">ACTIVE CLIENT</span>
@@ -83,7 +79,6 @@ function CompetitorsContent() {
             </div>
           </div>
 
-          {/* Competitor Overview Table */}
           <div className="bg-[#111622] border border-[#A9C7E5]/10 rounded-xl overflow-hidden">
             <div className="p-4 border-b border-[#A9C7E5]/10">
               <h3 className="text-sm font-bold text-white uppercase tracking-wider font-mono">
