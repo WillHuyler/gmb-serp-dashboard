@@ -151,4 +151,80 @@ function ConnectionCenterContent() {
         <div className="bg-[#111622] border border-[#A9C7E5]/10 rounded-lg px-3 py-2 text-right">
           <span className="text-[10px] font-mono text-slate-400 uppercase block">Certification Status</span>
           <span
-            className={`text-xs font-mono font-bold
+            className={`text-xs font-mono font-bold ${
+              activeClient?.is_certified ? 'text-emerald-400' : 'text-amber-400'
+            }`}
+          >
+            {activeClient?.is_certified ? '✓ CERTIFIED BASELINE' : '⚠ UNCERTIFIED BASELINE'}
+          </span>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        {PROVIDERS.map((provider) => {
+          const { label, badgeClass, accountId } = resolveProviderStatus(activeClient, provider);
+
+          return (
+            <div
+              key={provider.key}
+              className="bg-[#111622] border border-[#A9C7E5]/10 rounded-xl p-5 space-y-4 flex flex-col justify-between"
+            >
+              <div className="space-y-2">
+                <div className="flex justify-between items-start">
+                  <div className="flex items-center space-x-3">
+                    <div className="w-10 h-10 bg-[#151D2A] border border-[#A9C7E5]/10 rounded-lg flex items-center justify-center text-lg">
+                      {provider.icon}
+                    </div>
+                    <div>
+                      <h3 className="text-sm font-bold text-white">{provider.name}</h3>
+                      <span className="text-[10px] font-mono text-slate-400 uppercase">{provider.category}</span>
+                    </div>
+                  </div>
+
+                  <span className={`text-[10px] font-mono px-2 py-0.5 rounded border font-bold ${badgeClass}`}>
+                    {label}
+                  </span>
+                </div>
+
+                <p className="text-xs text-slate-400">{provider.description}</p>
+              </div>
+
+              <div className="pt-3 border-t border-[#A9C7E5]/10 flex justify-between items-center text-xs font-mono">
+                <div>
+                  <span className="text-[10px] text-slate-500 block uppercase">MAPPED ID</span>
+                  <span className="text-slate-300 font-bold">{accountId || 'UNMAPPED'}</span>
+                </div>
+
+                {accountId ? (
+                  <button
+                    disabled
+                    className="px-3 py-1.5 bg-[#151D2A] text-slate-400 rounded text-[11px] font-bold border border-[#A9C7E5]/10 cursor-not-allowed"
+                  >
+                    CONNECTED
+                  </button>
+                ) : (
+                  <button className="px-3 py-1.5 bg-[#D99614] hover:bg-[#B97A08] text-[#0B0F17] font-bold rounded text-[11px] transition-all">
+                    MAP ACCOUNT
+                  </button>
+                )}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </main>
+  );
+}
+
+export default function ConnectionCenterPage() {
+  return (
+    <div className="min-h-screen bg-[#0B0F17] text-white flex flex-col font-sans">
+      <Suspense fallback={<div className="p-6 text-xs text-slate-400 font-mono">Loading Header...</div>}>
+        <GlobalHeader />
+      </Suspense>
+      <Suspense fallback={<div className="p-6 text-xs text-slate-400 font-mono">Loading Integration Status...</div>}>
+        <ConnectionCenterContent />
+      </Suspense>
+    </div>
+  );
+}
