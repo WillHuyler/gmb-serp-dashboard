@@ -4,6 +4,7 @@ import React, { createContext, useContext, useState } from 'react';
 
 export interface ClientProfile {
   id: string;
+  tenant_id?: string;
   name: string;
   is_certified: boolean;
   service_areas: string[];
@@ -22,6 +23,7 @@ export interface ClientProfile {
 export const AUTHORITATIVE_CLIENT_REGISTRY: ClientProfile[] = [
   {
     id: 'bf93fef0-fc60-4119-8ea2-68a274984355',
+    tenant_id: 'tenant_porchlight_primary_01',
     name: 'High Rise Chimney Sweep',
     is_certified: true,
     service_areas: ['53202', '53203', '53211', '53217'],
@@ -38,6 +40,7 @@ export const AUTHORITATIVE_CLIENT_REGISTRY: ClientProfile[] = [
   },
   {
     id: 'c2d3e4f5-a6b7-8901-bcde-f23456789012',
+    tenant_id: 'tenant_porchlight_primary_01',
     name: 'Apex Dental Group',
     is_certified: true,
     service_areas: ['90210', '90211', '90212'],
@@ -52,6 +55,7 @@ export const AUTHORITATIVE_CLIENT_REGISTRY: ClientProfile[] = [
   },
   {
     id: 'd3e4f5a6-b7c8-9012-cdef-345678901234',
+    tenant_id: 'tenant_porchlight_primary_01',
     name: 'Kelly Hyundai',
     is_certified: true,
     service_areas: ['18015', '18017', '18018'],
@@ -66,6 +70,7 @@ export const AUTHORITATIVE_CLIENT_REGISTRY: ClientProfile[] = [
   },
   {
     id: 'e4f5a6b7-c8d9-0123-def0-456789012345',
+    tenant_id: 'tenant_porchlight_primary_01',
     name: 'DIMG Digital Marketing Group',
     is_certified: true,
     service_areas: ['10001', '10002', '10003'],
@@ -80,6 +85,7 @@ export const AUTHORITATIVE_CLIENT_REGISTRY: ClientProfile[] = [
   },
   {
     id: 'f5a6b7c8-d9e0-1234-ef01-567890123456',
+    tenant_id: 'tenant_porchlight_primary_01',
     name: 'FM Local Services',
     is_certified: true,
     service_areas: ['75001', '75002', '75006'],
@@ -94,6 +100,7 @@ export const AUTHORITATIVE_CLIENT_REGISTRY: ClientProfile[] = [
   },
   {
     id: 'a1b2c3d4-e5f6-7890-abcd-ef1234567890',
+    tenant_id: 'tenant_porchlight_primary_01',
     name: 'ABC Motors',
     is_certified: false,
     service_areas: ['30301', '30302'],
@@ -101,7 +108,7 @@ export const AUTHORITATIVE_CLIENT_REGISTRY: ClientProfile[] = [
   },
 ];
 
-// Backwards-compatible alias for existing API route imports
+// Backwards-compatible alias for API route imports
 export const CANONICAL_CLIENTS = AUTHORITATIVE_CLIENT_REGISTRY;
 
 interface ClientContextType {
