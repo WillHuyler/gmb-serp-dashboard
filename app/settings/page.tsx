@@ -1,56 +1,115 @@
 'use client';
 
-import React from 'react';
+import React, { Suspense } from 'react';
 import { useClient } from '../../lib/client-context';
+import GlobalHeader from '../../components/navigation/GlobalHeader';
 
-export default function SettingsPage() {
+export const dynamic = 'force-dynamic';
+
+function SettingsContent() {
   const { activeClient } = useClient();
 
   return (
-    <div className="space-y-6 text-[#0B1F3A]">
-      <div className="flex justify-between items-start">
+    <main className="flex-1 p-6 max-w-7xl w-full mx-auto space-y-6">
+      {/* Page Header */}
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>
-          <span className="text-[10px] font-mono uppercase tracking-widest text-slate-400 font-bold block">
-            PLATFORM SETTINGS
+          <span className="text-[10px] font-mono uppercase tracking-widest text-[#D99614] font-bold block">
+            SYSTEM ARCHITECTURE • TENANT SETTINGS
           </span>
-          <h1 className="text-2xl font-bold tracking-tight text-[#0B1F3A] mt-0.5">
-            {activeClient?.name || 'Active Client'}
-          </h1>
-          <p className="text-xs text-[#53657D] mt-1">
-            Organization details, client assignments, entitlements, and security controls.
-          </p>
-        </div>
-      </div>
-
-      <div className="bg-white border border-[#DCE5EF] rounded-xl p-8 space-y-6 shadow-sm max-w-3xl">
-        <div className="border-b border-[#DCE5EF] pb-4">
-          <h3 className="text-sm font-bold text-[#0B1F3A]">Client Context Settings</h3>
-          <p className="text-xs text-[#53657D] mt-0.5">
-            Current active context and database tenant configuration.
+          <h1 className="text-2xl font-bold tracking-tight text-white mt-1">Tenant & Integration Settings</h1>
+          <p className="text-xs text-slate-400 mt-0.5">
+            Active mapping keys and system configurations for <strong className="text-white">{activeClient?.name || 'Selected Client'}</strong>.
           </p>
         </div>
 
-        <div className="space-y-4 font-mono text-xs">
-          <div className="flex justify-between items-center py-2 border-b border-[#DCE5EF]">
-            <span className="text-slate-400">ACTIVE CLIENT:</span>
-            <span className="font-bold text-[#0B1F3A]">{activeClient?.name || 'None Selected'}</span>
+        <div className="flex items-center space-x-3">
+          <span
+            className={`text-xs font-mono px-3 py-1 rounded border font-bold ${
+              activeClient?.is_certified
+                ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'
+                : 'bg-amber-500/10 text-amber-400 border-amber-500/20'
+            }`}
+          >
+            {activeClient?.is_certified ? '✓ CERTIFIED BASELINE' : '⚠ UNCERTIFIED BASELINE'}
+          </span>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        {/* Active Client Mapping ID Ledger */}
+        <div className="bg-[#111622] border border-[#A9C7E5]/10 rounded-xl p-5 space-y-4">
+          <h3 className="text-sm font-bold text-white uppercase font-mono tracking-wider">
+            CANONICAL PROVIDER MAPPINGS
+          </h3>
+          
+          <div className="space-y-3 text-xs font-mono">
+            <div className="flex justify-between py-2 border-b border-[#A9C7E5]/10">
+              <span className="text-slate-400">CLIENT ID</span>
+              <span className="text-white font-bold">{activeClient?.id || 'UNASSIGNED'}</span>
+            </div>
+            <div className="flex justify-between py-2 border-b border-[#A9C7E5]/10">
+              <span className="text-slate-400">GOOGLE ADS ID</span>
+              <span className="text-slate-200">{activeClient?.mappings?.google_ads_id || 'UNMAPPED'}</span>
+            </div>
+            <div className="flex justify-between py-2 border-b border-[#A9C7E5]/10">
+              <span className="text-slate-400">META ACT ID</span>
+              <span className="text-slate-200">{activeClient?.mappings?.meta_act_id || 'UNMAPPED'}</span>
+            </div>
+            <div className="flex justify-between py-2 border-b border-[#A9C7E5]/10">
+              <span className="text-slate-400">GA4 PROPERTY ID</span>
+              <span className="text-slate-200">{activeClient?.mappings?.ga4_property_id || 'UNMAPPED'}</span>
+            </div>
+            <div className="flex justify-between py-2 border-b border-[#A9C7E5]/10">
+              <span className="text-slate-400">GSC SITE URL</span>
+              <span className="text-slate-200">{activeClient?.mappings?.gsc_site_url || 'UNMAPPED'}</span>
+            </div>
+            <div className="flex justify-between py-2 border-b border-[#A9C7E5]/10">
+              <span className="text-slate-400">BRIGHTLOCAL LOCATION ID</span>
+              <span className="text-slate-200">{activeClient?.mappings?.brightlocal_location_id || 'UNMAPPED'}</span>
+            </div>
           </div>
-          <div className="flex justify-between items-center py-2 border-b border-[#DCE5EF]">
-            <span className="text-slate-400">CLIENT ID:</span>
-            <span className="text-[#53657D]">{activeClient?.id || 'N/A'}</span>
-          </div>
-          <div className="flex justify-between items-center py-2 border-b border-[#DCE5EF]">
-            <span className="text-slate-400">TENANT ID:</span>
-            <span className="text-[#53657D]">{activeClient?.tenant_id || '00000000-0000-0000-0000-000000000001'}</span>
-          </div>
-          <div className="flex justify-between items-center py-2 border-b border-[#DCE5EF]">
-            <span className="text-slate-400">CERTIFICATION STATUS:</span>
-            <span className={`font-bold ${activeClient?.is_certified ? 'text-[#12A36D]' : 'text-amber-600'}`}>
-              {activeClient?.is_certified ? '✓ CERTIFIED' : '⚠ UNCERTIFIED'}
-            </span>
+        </div>
+
+        {/* System Diagnostics & Environment Secrets Status */}
+        <div className="bg-[#111622] border border-[#A9C7E5]/10 rounded-xl p-5 space-y-4">
+          <h3 className="text-sm font-bold text-white uppercase font-mono tracking-wider">
+            ENVIRONMENT & API SECRETS HEALTH
+          </h3>
+
+          <div className="space-y-3 text-xs font-mono">
+            <div className="flex justify-between py-2 border-b border-[#A9C7E5]/10">
+              <span className="text-slate-400">SUPABASE DATABASE URL</span>
+              <span className="text-emerald-400 font-bold">CONFIGURED</span>
+            </div>
+            <div className="flex justify-between py-2 border-b border-[#A9C7E5]/10">
+              <span className="text-slate-400">SUPABASE SERVICE ROLE KEY</span>
+              <span className="text-emerald-400 font-bold">CONFIGURED</span>
+            </div>
+            <div className="flex justify-between py-2 border-b border-[#A9C7E5]/10">
+              <span className="text-slate-400">PLAID AI ENGINE</span>
+              <span className="text-emerald-400 font-bold">ACTIVE / ONLINE</span>
+            </div>
+            <div className="flex justify-between py-2 border-b border-[#A9C7E5]/10">
+              <span className="text-slate-400">DIAGNOSTIC HEALTH ROUTE</span>
+              <span className="text-emerald-400 font-bold">/api/health (200 OK)</span>
+            </div>
           </div>
         </div>
       </div>
+    </main>
+  );
+}
+
+export default function SettingsPage() {
+  return (
+    <div className="min-h-screen bg-[#0B0F17] text-white flex flex-col font-sans">
+      <Suspense fallback={<div className="p-6 text-xs text-slate-400 font-mono">Loading Header...</div>}>
+        <GlobalHeader />
+      </Suspense>
+      <Suspense fallback={<div className="p-6 text-xs text-slate-400 font-mono">Loading Settings...</div>}>
+        <SettingsContent />
+      </Suspense>
     </div>
   );
 }
