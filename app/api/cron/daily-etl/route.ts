@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
-import { CANONICAL_CLIENTS } from '../../../lib/client-context';
+import { CANONICAL_CLIENTS } from '../../../../lib/client-context';
 
 // Initialize Supabase Admin Client
 const supabase = createClient(
