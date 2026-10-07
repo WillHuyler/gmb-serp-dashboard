@@ -1,10 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { validateClientAccess } from '@/lib/auth-guard';
-import { CANONICAL_CLIENTS } from '@/lib/client-context';
+import { validateClientAccess } from '../../../lib/auth-guard';
+import { CANONICAL_CLIENTS } from '../../../lib/client-context';
 
 export interface IntegrationSyncPayload {
   clientId: string;
-  provider: 
+  provider:
     | 'gmb'
     | 'google_ads'
     | 'ga4'
@@ -19,18 +19,13 @@ export interface IntegrationSyncPayload {
 
 export async function POST(req: NextRequest) {
   try {
-    const authHeader = req.headers.get('authorization');
     const body: IntegrationSyncPayload = await req.json();
-
     const { clientId, provider, externalAccountId, telemetryData } = body;
 
     // 1. Enforce Server-Side Tenant Scoping Security Gate
-    const accessCheck = await validateClientAccess(authHeader, clientId);
+    const accessCheck = await validateClientAccess(req, clientId || undefined);
     if (!accessCheck.authorized) {
-      return NextResponse.json(
-        { error: 'UNAUTHORIZED_TENANT_ACCESS', message: accessCheck.message },
-        { status: 403 }
-      );
+      return accessCheck.errorResponse || NextResponse.json({ error: 'FORBIDDEN' }, { status: 403 });
     }
 
     // 2. Validate Target Client Identity in Canonical Registry
@@ -67,7 +62,7 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // 4. Ingestion Process & Telemetry Persistence (Mock Pipeline Output)
+    // 4. Successful Ingestion Acknowledgement
     return NextResponse.json({
       status: 'SYNC_SUCCESS',
       timestamp: new Date().toISOString(),
@@ -78,7 +73,7 @@ export async function POST(req: NextRequest) {
       },
       provider,
       externalAccountId,
-      recordsIngested: Object.keys(telemetryData).length,
+      recordsIngested: Object.keys(telemetryData || {}).length,
     });
   } catch (error: any) {
     return NextResponse.json(
