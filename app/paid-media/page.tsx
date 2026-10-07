@@ -4,7 +4,6 @@ import React, { Suspense } from 'react';
 import { useClient } from '../../lib/client-context';
 import GlobalHeader from '../../components/navigation/GlobalHeader';
 
-// Enforce dynamic execution to support useSearchParams without static pre-render bailout
 export const dynamic = 'force-dynamic';
 
 function PaidMediaContent() {
@@ -19,7 +18,7 @@ function PaidMediaContent() {
           </span>
           <h2 className="text-xl font-bold text-white">NO CERTIFIED PAID MEDIA MAPPINGS</h2>
           <p className="text-slate-400 text-xs max-w-md mx-auto">
-            <strong className="text-white">{activeClient?.name || 'Selected Client'}</strong> has no mapped Google Ads or Meta Ads account IDs. Configure ad account mappings in Connection Center to view live campaign telemetry.
+            <strong className="text-white">{activeClient?.name || 'Selected Client'}</strong> has no mapped Google Ads or Meta Ads account IDs[cite: 1]. Configure ad account mappings in Connection Center to view live campaign telemetry.
           </p>
         </div>
       </main>
@@ -39,7 +38,7 @@ function PaidMediaContent() {
           </p>
         </div>
       </div>
-      
+
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <div className="bg-[#111622] border border-[#A9C7E5]/10 rounded-xl p-4 space-y-1">
           <span className="text-[10px] font-mono text-slate-400 uppercase font-bold block">GOOGLE ADS SPEND</span>
