@@ -89,7 +89,8 @@ const PROVIDERS: ProviderConfig[] = [
   },
 ];
 
-export function resolveProviderStatus(
+// Helper function made module-private (removed export to satisfy Next.js Page constraints)
+function resolveProviderStatus(
   client: any,
   provider: ProviderConfig
 ): { status: ConnectionStatus; label: string; badgeClass: string; accountId: string | null } {
