@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
-import { CANONICAL_CLIENTS } from '@/lib/client-context';
+import { CANONICAL_CLIENTS } from '../../../lib/client-context';
 
-// Initialize Supabase Admin Client (Service Role for write access)
+// Initialize Supabase Admin Client
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL || '',
   process.env.SUPABASE_SERVICE_ROLE_KEY || ''
@@ -10,7 +10,7 @@ const supabase = createClient(
 
 export async function GET(req: NextRequest) {
   try {
-    // 1. Verify Cron Secret to prevent unauthorized executions
+    // 1. Verify Cron Secret Header
     const authHeader = req.headers.get('authorization');
     if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
       return NextResponse.json({ error: 'UNAUTHORIZED_CRON_TRIGGER' }, { status: 401 });
@@ -18,7 +18,7 @@ export async function GET(req: NextRequest) {
 
     const targetDate = new Date();
     targetDate.setDate(targetDate.getDate() - 1);
-    const formattedDate = targetDate.toISOString().split('T')[0]; // YYYY-MM-DD
+    const formattedDate = targetDate.toISOString().split('T')[0];
 
     const executionLog: Array<{ clientId: string; status: string; recordsUpdated: number }> = [];
 
@@ -32,7 +32,6 @@ export async function GET(req: NextRequest) {
       // --- PLATFORM 1: Google My Business (GMB) ---
       let gmbMetrics = { calls: 0, directions: 0, website_clicks: 0, interactions: 0 };
       if (client.mappings?.gmb_account_id) {
-        // Fetch GMB Performance API for past day
         gmbMetrics = await fetchGmbMetrics(client.mappings.gmb_account_id, formattedDate);
       }
 
@@ -66,7 +65,7 @@ export async function GET(req: NextRequest) {
         brightlocalMetrics = await fetchBrightLocalMetrics(client.mappings.brightlocal_location_id, formattedDate);
       }
 
-      // 3. Upsert Compiled Metrics into Supabase `daily_client_metrics`
+      // 3. Upsert Compiled Metrics into Supabase
       const { error: upsertError } = await supabase
         .from('daily_client_metrics')
         .upsert(
@@ -109,34 +108,27 @@ export async function GET(req: NextRequest) {
   }
 }
 
-// --- PLATFORM FETCH ADAPTERS ---
-
+// Adapters
 async function fetchGmbMetrics(accountId: string, date: string) {
-  // Target: https://mybusinessverifications.googleapis.com/v1/
   return { calls: 14, directions: 22, website_clicks: 36, interactions: 68 };
 }
 
 async function fetchGoogleAdsMetrics(customerId: string, date: string) {
-  // Target: Google Ads API SearchStream / v16
   return { spend: 145.5, impressions: 1240, clicks: 88, conversions: 9 };
 }
 
 async function fetchGa4Metrics(propertyId: string, date: string) {
-  // Target: Analytics Data API v1beta runReport
   return { sessions: 310, active_users: 245, engaged_sessions: 198 };
 }
 
 async function fetchGscMetrics(siteUrl: string, date: string) {
-  // Target: Search Console API v3 searchanalytics/query
   return { organic_clicks: 142, organic_impressions: 3800, avg_position: 4.2 };
 }
 
 async function fetchMetaAdsMetrics(actId: string, date: string) {
-  // Target: Meta Graph API v19.0 act_{act_id}/insights
   return { spend: 85.2, impressions: 2100, clicks: 45 };
 }
 
 async function fetchBrightLocalMetrics(locationId: string, date: string) {
-  // Target: BrightLocal SERP API / LSERP
   return { avg_map_rank: 1.8, top3_count: 5 };
 }
