@@ -1,6 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
-import { CANONICAL_CLIENTS } from '../../../lib/client-context';
+
+// Enforce dynamic server execution and prevent build-time static evaluation
+export const dynamic = 'force-dynamic';
+
+const CANONICAL_ROSTER = [
+  { id: 'a1b2c3d4-e5f6-7890-abcd-ef1234567890', name: 'ABC Motors', is_certified: false },
+  { id: 'bf93fef0-fc60-4119-8ea2-68a274984355', name: 'High Rise Chimney Sweep', is_certified: true },
+  { id: 'c2d3e4f5-a6b7-8901-bcde-f23456789012', name: 'Apex Dental Group', is_certified: true },
+  { id: 'd3e4f5a6-b7c8-9012-cdef-345678901234', name: 'Kelly Hyundai', is_certified: true },
+];
 
 export async function GET(req: NextRequest) {
   const startTime = Date.now();
@@ -27,8 +36,8 @@ export async function GET(req: NextRequest) {
     }
   }
 
-  const certifiedClients = CANONICAL_CLIENTS.filter((c) => c.is_certified).length;
-  const totalClients = CANONICAL_CLIENTS.length;
+  const certifiedClients = CANONICAL_ROSTER.filter((c) => c.is_certified).length;
+  const totalClients = CANONICAL_ROSTER.length;
 
   return NextResponse.json({
     status: dbConnected ? 'HEALTHY' : 'DEGRADED',
