@@ -4,7 +4,7 @@ import React, { createContext, useContext, useState } from 'react';
 
 export interface ClientProfile {
   id: string;
-  tenant_id: string;
+  tenant_id?: string;
   name: string;
   address?: string;
   is_certified: boolean;
@@ -18,6 +18,8 @@ export interface ClientProfile {
     gmb_location_id?: string;
     brightlocal_location_id?: string;
     serpapi_location_key?: string;
+    bing_webmaster_site_url?: string;
+    clarity_project_id?: string;
   };
 }
 
@@ -39,6 +41,8 @@ export const AUTHORITATIVE_CLIENT_REGISTRY: ClientProfile[] = [
       gmb_account_id: 'accounts/109283748291',
       gmb_location_id: 'locations/847291048291',
       brightlocal_location_id: 'bl_loc_highrise_53202',
+      bing_webmaster_site_url: 'https://highrisechimney.com',
+      clarity_project_id: 'clr_highrise_99',
     },
   },
   {
@@ -56,6 +60,8 @@ export const AUTHORITATIVE_CLIENT_REGISTRY: ClientProfile[] = [
       gmb_account_id: 'accounts/109283748291',
       gmb_location_id: 'locations/992817401928',
       brightlocal_location_id: 'bl_loc_kelly_18360',
+      bing_webmaster_site_url: 'https://kellyhyundai.com',
+      clarity_project_id: 'clr_kelly_101',
     },
   },
   {
@@ -73,6 +79,8 @@ export const AUTHORITATIVE_CLIENT_REGISTRY: ClientProfile[] = [
       gmb_account_id: 'accounts/109283748291',
       gmb_location_id: 'locations/112233445566',
       brightlocal_location_id: 'bl_loc_apex_90210',
+      bing_webmaster_site_url: 'https://apexdentalgroup.com',
+      clarity_project_id: 'clr_apex_102',
     },
   },
   {
