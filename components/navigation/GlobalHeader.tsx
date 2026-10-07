@@ -12,23 +12,20 @@ export default function GlobalHeader() {
   const currentStartDate = searchParams.get('startDate') || '2026-09-01';
   const currentEndDate = searchParams.get('endDate') || '2026-09-30';
 
-  // Handle Client Switch
   const handleClientChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     const selectedId = e.target.value;
     const client = CANONICAL_CLIENTS.find((c) => c.id === selectedId);
     if (client) {
       setActiveClient(client);
-
       const params = new URLSearchParams(searchParams.toString());
       params.set('clientId', client.id);
       router.push(`?${params.toString()}`);
     }
   };
 
-  // Handle Date Preset Switch
   const handleDatePresetChange = (preset: string) => {
     const params = new URLSearchParams(searchParams.toString());
-    const today = new Date('2026-10-06'); // System baseline reference
+    const today = new Date('2026-10-06');
 
     let start = '2026-09-01';
     let end = '2026-09-30';
@@ -58,14 +55,12 @@ export default function GlobalHeader() {
 
   return (
     <header className="h-16 bg-[#111622] border-b border-[#A9C7E5]/10 px-6 flex items-center justify-between sticky top-0 z-50">
-      {/* Brand & App Title */}
       <div className="flex items-center space-x-6">
         <div className="flex items-center space-x-2">
           <span className="text-xl">🦉</span>
           <span className="font-bold tracking-wider text-sm font-mono text-white">PORCHLIGHT</span>
         </div>
 
-        {/* Client Selector Dropdown */}
         <div className="flex items-center space-x-2">
           <span className="text-[10px] font-mono text-slate-400 uppercase">CLIENT:</span>
           <select
@@ -82,38 +77,16 @@ export default function GlobalHeader() {
         </div>
       </div>
 
-      {/* Date Range Selector & Presets */}
       <div className="flex items-center space-x-3">
         <div className="flex items-center space-x-1 bg-[#151D2A] border border-[#A9C7E5]/10 rounded p-1 text-[11px] font-mono">
-          <button
-            onClick={() => handleDatePresetChange('7d')}
-            className="px-2 py-0.5 rounded hover:bg-slate-800 text-slate-300 hover:text-white transition-all"
-          >
-            7D
-          </button>
-          <button
-            onClick={() => handleDatePresetChange('30d')}
-            className="px-2 py-0.5 rounded hover:bg-slate-800 text-slate-300 hover:text-white transition-all"
-          >
-            30D
-          </button>
-          <button
-            onClick={() => handleDatePresetChange('mtd')}
-            className="px-2 py-0.5 rounded hover:bg-slate-800 text-slate-300 hover:text-white transition-all"
-          >
-            MTD
-          </button>
-          <button
-            onClick={() => handleDatePresetChange('qtd')}
-            className="px-2 py-0.5 rounded hover:bg-slate-800 text-slate-300 hover:text-white transition-all"
-          >
-            QTD
-          </button>
+          <button onClick={() => handleDatePresetChange('7d')} className="px-2 py-0.5 rounded hover:bg-slate-800 text-slate-300">7D</button>
+          <button onClick={() => handleDatePresetChange('30d')} className="px-2 py-0.5 rounded hover:bg-slate-800 text-slate-300">30D</button>
+          <button onClick={() => handleDatePresetChange('mtd')} className="px-2 py-0.5 rounded hover:bg-slate-800 text-slate-300">MTD</button>
+          <button onClick={() => handleDatePresetChange('qtd')} className="px-2 py-0.5 rounded hover:bg-slate-800 text-slate-300">QTD</button>
         </div>
 
         <div className="text-xs font-mono bg-[#151D2A] border border-[#A9C7E5]/10 rounded px-3 py-1.5 text-slate-300">
-          📅 <span className="text-white font-bold">{currentStartDate}</span> to{' '}
-          <span className="text-white font-bold">{currentEndDate}</span>
+          📅 <span className="text-white font-bold">{currentStartDate}</span> to <span className="text-white font-bold">{currentEndDate}</span>
         </div>
       </div>
     </header>
