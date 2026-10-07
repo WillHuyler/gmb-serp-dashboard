@@ -24,70 +24,14 @@ interface ProviderConfig {
 }
 
 const PROVIDERS: ProviderConfig[] = [
-  {
-    key: 'google_ads',
-    name: 'Google Ads',
-    category: 'Paid Acquisition',
-    mappingKey: 'google_ads_id',
-    description: 'Ad spend, campaign performance, CTR, and conversion telemetry.',
-    icon: '🎯',
-  },
-  {
-    key: 'meta_ads',
-    name: 'Meta Ads',
-    category: 'Paid Social',
-    mappingKey: 'meta_act_id',
-    description: 'Facebook & Instagram ad spend, reach, impressions, and link clicks.',
-    icon: '📲',
-  },
-  {
-    key: 'ga4',
-    name: 'Google Analytics 4',
-    category: 'Web Analytics',
-    mappingKey: 'ga4_property_id',
-    description: 'Web traffic sessions, active user counts, and engaged session metrics.',
-    icon: '📊',
-  },
-  {
-    key: 'gsc',
-    name: 'Google Search Console',
-    category: 'Organic Search',
-    mappingKey: 'gsc_site_url',
-    description: 'Organic clicks, impressions, CTR, and average SERP position.',
-    icon: '🔍',
-  },
-  {
-    key: 'gmb',
-    name: 'Google Business Profile',
-    category: 'Local Presence',
-    mappingKey: 'gmb_account_id',
-    description: 'Local profile calls, direction requests, website clicks, and reviews.',
-    icon: '📍',
-  },
-  {
-    key: 'brightlocal',
-    name: 'BrightLocal (OtterWatch)',
-    category: 'SERP Grid Engine',
-    mappingKey: 'brightlocal_location_id',
-    description: '5x5 geo-grid local map pack rankings and top-3 visibility scores.',
-    icon: '🦉',
-  },
-  {
-    key: 'bing_webmaster',
-    name: 'Bing Webmaster Tools',
-    category: 'Organic Search',
-    mappingKey: 'bing_webmaster_site_url',
-    description: 'Bing organic search indexation, search queries, and crawling health.',
-    icon: '🌐',
-  },
-  {
-    key: 'clarity',
-    name: 'Microsoft Clarity',
-    category: 'Behavioral Insights',
-    mappingKey: 'clarity_project_id',
-    description: 'User heatmaps, session recordings, and frustration click metrics.',
-    icon: '👁️',
-  },
+  { key: 'google_ads', name: 'Google Ads', category: 'Paid Acquisition', mappingKey: 'google_ads_id', description: 'Ad spend, campaign performance, CTR, and conversion telemetry.', icon: '🎯' },
+  { key: 'meta_ads', name: 'Meta Ads', category: 'Paid Social', mappingKey: 'meta_act_id', description: 'Facebook & Instagram ad spend, reach, impressions, and link clicks.', icon: '📲' },
+  { key: 'ga4', name: 'Google Analytics 4', category: 'Web Analytics', mappingKey: 'ga4_property_id', description: 'Web traffic sessions, active user counts, and engaged session metrics.', icon: '📊' },
+  { key: 'gsc', name: 'Google Search Console', category: 'Organic Search', mappingKey: 'gsc_site_url', description: 'Organic clicks, impressions, CTR, and average SERP position.', icon: '🔍' },
+  { key: 'gmb', name: 'Google Business Profile', category: 'Local Presence', mappingKey: 'gmb_account_id', description: 'Local profile calls, direction requests, website clicks, and reviews.', icon: '📍' },
+  { key: 'brightlocal', name: 'BrightLocal (OtterWatch)', category: 'SERP Grid Engine', mappingKey: 'brightlocal_location_id', description: '5x5 geo-grid local map pack rankings and top-3 visibility scores.', icon: '🦉' },
+  { key: 'bing_webmaster', name: 'Bing Webmaster Tools', category: 'Organic Search', mappingKey: 'bing_webmaster_site_url', description: 'Bing organic search indexation, search queries, and crawling health.', icon: '🌐' },
+  { key: 'clarity', name: 'Microsoft Clarity', category: 'Behavioral Insights', mappingKey: 'clarity_project_id', description: 'User heatmaps, session recordings, and frustration click metrics.', icon: '👁️' },
 ];
 
 function resolveProviderStatus(
@@ -95,40 +39,20 @@ function resolveProviderStatus(
   provider: ProviderConfig
 ): { status: ConnectionStatus; label: string; badgeClass: string; accountId: string | null } {
   if (!client) {
-    return {
-      status: 'NOT_CONNECTED',
-      label: 'NOT CONNECTED',
-      badgeClass: 'bg-slate-800 text-slate-400 border-slate-700',
-      accountId: null,
-    };
+    return { status: 'NOT_CONNECTED', label: 'NOT CONNECTED', badgeClass: 'bg-slate-800 text-slate-400 border-slate-700', accountId: null };
   }
 
   const accountId = client.mappings?.[provider.mappingKey] || null;
 
   if (!accountId || String(accountId).trim() === '') {
-    return {
-      status: 'NOT_CONNECTED',
-      label: 'NOT CONNECTED',
-      badgeClass: 'bg-slate-800 text-slate-400 border-slate-700',
-      accountId: null,
-    };
+    return { status: 'NOT_CONNECTED', label: 'NOT CONNECTED', badgeClass: 'bg-slate-800 text-slate-400 border-slate-700', accountId: null };
   }
 
   if (!client.is_certified) {
-    return {
-      status: 'MAPPED',
-      label: 'MAPPED (UNCERTIFIED BASELINE)',
-      badgeClass: 'bg-blue-500/10 text-blue-400 border-blue-500/20',
-      accountId,
-    };
+    return { status: 'MAPPED', label: 'MAPPED (UNCERTIFIED BASELINE)', badgeClass: 'bg-blue-500/10 text-blue-400 border-blue-500/20', accountId };
   }
 
-  return {
-    status: 'HEALTHY',
-    label: 'LIVE & SYNCHRONIZED',
-    badgeClass: 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20',
-    accountId,
-  };
+  return { status: 'HEALTHY', label: 'LIVE & SYNCHRONIZED', badgeClass: 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20', accountId };
 }
 
 function ConnectionCenterContent() {
@@ -150,11 +74,7 @@ function ConnectionCenterContent() {
 
         <div className="bg-[#111622] border border-[#A9C7E5]/10 rounded-lg px-3 py-2 text-right">
           <span className="text-[10px] font-mono text-slate-400 uppercase block">Certification Status</span>
-          <span
-            className={`text-xs font-mono font-bold ${
-              activeClient?.is_certified ? 'text-emerald-400' : 'text-amber-400'
-            }`}
-          >
+          <span className={`text-xs font-mono font-bold ${activeClient?.is_certified ? 'text-emerald-400' : 'text-amber-400'}`}>
             {activeClient?.is_certified ? '✓ CERTIFIED BASELINE' : '⚠ UNCERTIFIED BASELINE'}
           </span>
         </div>
@@ -165,10 +85,7 @@ function ConnectionCenterContent() {
           const { label, badgeClass, accountId } = resolveProviderStatus(activeClient, provider);
 
           return (
-            <div
-              key={provider.key}
-              className="bg-[#111622] border border-[#A9C7E5]/10 rounded-xl p-5 space-y-4 flex flex-col justify-between"
-            >
+            <div key={provider.key} className="bg-[#111622] border border-[#A9C7E5]/10 rounded-xl p-5 space-y-4 flex flex-col justify-between">
               <div className="space-y-2">
                 <div className="flex justify-between items-start">
                   <div className="flex items-center space-x-3">
@@ -196,10 +113,7 @@ function ConnectionCenterContent() {
                 </div>
 
                 {accountId ? (
-                  <button
-                    disabled
-                    className="px-3 py-1.5 bg-[#151D2A] text-slate-400 rounded text-[11px] font-bold border border-[#A9C7E5]/10 cursor-not-allowed"
-                  >
+                  <button disabled className="px-3 py-1.5 bg-[#151D2A] text-slate-400 rounded text-[11px] font-bold border border-[#A9C7E5]/10 cursor-not-allowed">
                     CONNECTED
                   </button>
                 ) : (
