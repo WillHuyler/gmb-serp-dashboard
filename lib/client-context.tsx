@@ -108,30 +108,43 @@ export const AUTHORITATIVE_CLIENT_REGISTRY: ClientProfile[] = [
   },
 ];
 
-// Backwards-compatible alias for API route imports
+// Backwards-compatible alias for existing API route exports
 export const CANONICAL_CLIENTS = AUTHORITATIVE_CLIENT_REGISTRY;
 
 interface ClientContextType {
   activeClient: ClientProfile | null;
   setActiveClient: (client: ClientProfile) => void;
+  setActiveClientId: (id: string) => void;
   clientRegistry: ClientProfile[];
+  clients: ClientProfile[];
 }
 
 const ClientContext = createContext<ClientContextType>({
   activeClient: AUTHORITATIVE_CLIENT_REGISTRY[0],
   setActiveClient: () => {},
+  setActiveClientId: () => {},
   clientRegistry: AUTHORITATIVE_CLIENT_REGISTRY,
+  clients: AUTHORITATIVE_CLIENT_REGISTRY,
 });
 
 export function ClientProvider({ children }: { children: React.ReactNode }) {
   const [activeClient, setActiveClient] = useState<ClientProfile>(AUTHORITATIVE_CLIENT_REGISTRY[0]);
+
+  const setActiveClientId = (id: string) => {
+    const found = AUTHORITATIVE_CLIENT_REGISTRY.find((c) => c.id === id);
+    if (found) {
+      setActiveClient(found);
+    }
+  };
 
   return (
     <ClientContext.Provider
       value={{
         activeClient,
         setActiveClient,
+        setActiveClientId,
         clientRegistry: AUTHORITATIVE_CLIENT_REGISTRY,
+        clients: AUTHORITATIVE_CLIENT_REGISTRY,
       }}
     >
       {children}
