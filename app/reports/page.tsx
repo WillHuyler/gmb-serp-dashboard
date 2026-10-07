@@ -23,7 +23,6 @@ function ReportsContent() {
 
   return (
     <main className="flex-1 p-6 max-w-7xl w-full mx-auto space-y-6">
-      {/* Page Header */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>
           <span className="text-[10px] font-mono uppercase tracking-widest text-[#D99614] font-bold block">
@@ -48,7 +47,6 @@ function ReportsContent() {
         </div>
       </div>
 
-      {/* Fail-Closed Gate for Uncertified Clients */}
       {!isCertified ? (
         <div className="p-8 rounded-xl bg-[#111622] border border-[#A9C7E5]/10 text-center space-y-3">
           <span className="text-amber-400 text-xs font-mono tracking-widest uppercase block font-bold">
@@ -56,11 +54,10 @@ function ReportsContent() {
           </span>
           <h2 className="text-xl font-bold text-white">EXPORT GAITED (UNCERTIFIED BASELINE)</h2>
           <p className="text-slate-400 text-xs max-w-md mx-auto">
-            <strong className="text-white">{activeClient.name}</strong> operates on an uncertified baseline. Configure active integrations in Connection Center to generate exportable client performance reports.
+            <strong className="text-white">{activeClient.name}</strong> operates on an uncertified baseline[cite: 1]. Configure active integrations in Connection Center to generate exportable client performance reports.
           </p>
         </div>
       ) : (
-        /* Certified Reporting Surface */
         <div className="space-y-6">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div className="bg-[#111622] border border-[#A9C7E5]/10 rounded-xl p-5 space-y-3">
