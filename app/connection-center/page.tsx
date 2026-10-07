@@ -1,172 +1,220 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React from 'react';
+import Link from 'next/link';
 import { useClient } from '../../lib/client-context';
+import GlobalHeader from '../../components/navigation/GlobalHeader';
 
-interface ExternalAccount {
-  id: string;
-  provider: string;
-  external_account_id: string;
-  descriptive_name: string;
-  account_type: string;
-  status: string;
-  currency: string;
-  timezone: string;
-  discovered_at: string;
+export type ConnectionStatus =
+  | 'NOT_CONNECTED'
+  | 'AUTHORIZING'
+  | 'MAPPED'
+  | 'HEALTHY'
+  | 'STALE'
+  | 'CONFIGURATION_REQUIRED';
+
+interface ProviderConfig {
+  key: string;
+  name: string;
+  category: string;
+  mappingKey: string;
+  description: string;
+  icon: string;
+}
+
+const PROVIDERS: ProviderConfig[] = [
+  {
+    key: 'google_ads',
+    name: 'Google Ads',
+    category: 'Paid Acquisition',
+    mappingKey: 'google_ads_id',
+    description: 'Ad spend, campaign performance, CTR, and conversion telemetry.',
+    icon: '🎯',
+  },
+  {
+    key: 'meta_ads',
+    name: 'Meta Ads',
+    category: 'Paid Social',
+    mappingKey: 'meta_act_id',
+    description: 'Facebook & Instagram ad spend, reach, impressions, and link clicks.',
+    icon: '📲',
+  },
+  {
+    key: 'ga4',
+    name: 'Google Analytics 4',
+    category: 'Web Analytics',
+    mappingKey: 'ga4_property_id',
+    description: 'Web traffic sessions, active user counts, and engaged session metrics.',
+    icon: '📊',
+  },
+  {
+    key: 'gsc',
+    name: 'Google Search Console',
+    category: 'Organic Search',
+    mappingKey: 'gsc_site_url',
+    description: 'Organic clicks, impressions, CTR, and average SERP position.',
+    icon: '🔍',
+  },
+  {
+    key: 'gmb',
+    name: 'Google Business Profile',
+    category: 'Local Presence',
+    mappingKey: 'gmb_account_id',
+    description: 'Local profile calls, direction requests, website clicks, and reviews.',
+    icon: '📍',
+  },
+  {
+    key: 'brightlocal',
+    name: 'BrightLocal (OtterWatch)',
+    category: 'SERP Grid Engine',
+    mappingKey: 'brightlocal_location_id',
+    description: '5x5 geo-grid local map pack rankings and top-3 visibility scores.',
+    icon: '🦉',
+  },
+  {
+    key: 'bing_webmaster',
+    name: 'Bing Webmaster Tools',
+    category: 'Organic Search',
+    mappingKey: 'bing_webmaster_site_url',
+    description: 'Bing organic search indexation, search queries, and crawling health.',
+    icon: '🌐',
+  },
+  {
+    key: 'clarity',
+    name: 'Microsoft Clarity',
+    category: 'Behavioral Insights',
+    mappingKey: 'clarity_project_id',
+    description: 'User heatmaps, session recordings, and frustration click metrics.',
+    icon: '👁️',
+  },
+];
+
+export function resolveProviderStatus(
+  client: any,
+  provider: ProviderConfig
+): { status: ConnectionStatus; label: string; badgeClass: string; accountId: string | null } {
+  if (!client) {
+    return {
+      status: 'NOT_CONNECTED',
+      label: 'NOT CONNECTED',
+      badgeClass: 'bg-slate-800 text-slate-400 border-slate-700',
+      accountId: null,
+    };
+  }
+
+  const accountId = client.mappings?.[provider.mappingKey] || null;
+
+  if (!accountId || String(accountId).trim() === '') {
+    return {
+      status: 'NOT_CONNECTED',
+      label: 'NOT CONNECTED',
+      badgeClass: 'bg-slate-800 text-slate-400 border-slate-700',
+      accountId: null,
+    };
+  }
+
+  if (!client.is_certified) {
+    return {
+      status: 'MAPPED',
+      label: 'MAPPED (UNCERTIFIED BASELINE)',
+      badgeClass: 'bg-blue-500/10 text-blue-400 border-blue-500/20',
+      accountId,
+    };
+  }
+
+  return {
+    status: 'HEALTHY',
+    label: 'LIVE & SYNCHRONIZED',
+    badgeClass: 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20',
+    accountId,
+  };
 }
 
 export default function ConnectionCenterPage() {
   const { activeClient } = useClient();
-  const [accounts, setAccounts] = useState<ExternalAccount[]>([]);
-  const [isLoading, setIsLoading] = useState<boolean>(true);
-  const [mappingId, setMappingId] = useState<string | null>(null);
-
-  useEffect(() => {
-    async function fetchInventory() {
-      try {
-        const res = await fetch('/api/data/inventory');
-        const data = await res.json();
-        if (data.success) {
-          setAccounts(data.accounts);
-        }
-      } catch (err) {
-        console.error('Failed to load inventory:', err);
-      } finally {
-        setIsLoading(false);
-      }
-    }
-    fetchInventory();
-  }, []);
-
-  const handleMapAccount = async (account: ExternalAccount) => {
-    const params = new URLSearchParams(window.location.search);
-    const targetClientId = activeClient?.id || params.get('clientId');
-
-    if (!targetClientId) {
-      alert('Please select a client from the header dropdown first.');
-      return;
-    }
-
-    setMappingId(account.id);
-
-    try {
-      const res = await fetch('/api/data/mappings', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          client_id: targetClientId,
-          external_account_id: account.id, // Sends DB UUID primary key
-          provider: account.provider,
-        }),
-      });
-
-      const data = await res.json();
-      if (data.success) {
-        alert(`Successfully mapped ${account.descriptive_name}! Status set to Certified.`);
-        window.location.reload();
-      } else {
-        alert(`Mapping failed: ${data.error}`);
-      }
-    } catch (err) {
-      console.error('Error mapping account:', err);
-      alert('Error linking account to client.');
-    } finally {
-      setMappingId(null);
-    }
-  };
 
   return (
-    <div className="p-8 space-y-8 bg-[#0B0F17] text-white min-h-screen">
-      <div className="flex justify-between items-center">
-        <div>
-          <div className="flex items-center space-x-3">
-            <h1 className="text-2xl font-bold tracking-tight">CONNECTION CENTER</h1>
-            <span className="bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 text-[10px] font-mono px-2 py-0.5 rounded font-bold">
-              PHASE 2 / 3 INVENTORY
+    <div className="min-h-screen bg-[#0B0F17] text-white flex flex-col font-sans">
+      <GlobalHeader />
+
+      <main className="flex-1 p-6 max-w-7xl w-full mx-auto space-y-6">
+        <div className="flex justify-between items-start">
+          <div>
+            <span className="text-[10px] font-mono uppercase tracking-widest text-[#D99614] font-bold block">
+              SYSTEM ARCHITECTURE • INTEGRATION SPINE
+            </span>
+            <h1 className="text-2xl font-bold tracking-tight text-white mt-1">Connection Center</h1>
+            <p className="text-xs text-slate-400 mt-1">
+              Active provider connections, OAuth account mappings, and telemetry ingestion health for{' '}
+              <strong className="text-white">{activeClient?.name || 'Selected Client'}</strong>.
+            </p>
+          </div>
+
+          <div className="bg-[#111622] border border-[#A9C7E5]/10 rounded-lg px-3 py-2 text-right">
+            <span className="text-[10px] font-mono text-slate-400 uppercase block">Certification Status</span>
+            <span
+              className={`text-xs font-mono font-bold ${
+                activeClient?.is_certified ? 'text-emerald-400' : 'text-amber-400'
+              }`}
+            >
+              {activeClient?.is_certified ? '✓ CERTIFIED BASELINE' : '⚠ UNCERTIFIED BASELINE'}
             </span>
           </div>
-          <p className="text-sm text-slate-400 mt-1">
-            Provider Resource Ingestion & Multi-Tenant Account Mapping Matrix
-          </p>
         </div>
 
-        <div className="flex items-center space-x-3">
-          <button className="bg-[#55A9E6]/10 border border-[#55A9E6]/30 text-[#55A9E6] text-xs font-mono font-bold px-4 py-2 rounded hover:bg-[#55A9E6]/20 transition-all">
-            + CONNECT GOOGLE ADS
-          </button>
-          <button className="bg-blue-600/20 border border-blue-500/30 text-blue-400 text-xs font-mono font-bold px-4 py-2 rounded hover:bg-blue-600/30 transition-all">
-            + CONNECT META ADS
-          </button>
-        </div>
-      </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {PROVIDERS.map((provider) => {
+            const { label, badgeClass, accountId } = resolveProviderStatus(activeClient, provider);
 
-      <div className="bg-[#111622] border border-[#A9C7E5]/10 rounded-xl p-6 space-y-4">
-        <div className="flex justify-between items-center">
-          <h2 className="text-xs font-mono uppercase text-slate-400 tracking-wider">
-            DISCOVERED EXTERNAL ACCOUNTS INVENTORY
-          </h2>
-          <span className="text-xs font-mono text-slate-400">
-            TARGET CLIENT: <strong className="text-amber-400">{activeClient?.name || 'SELECT A CLIENT ABOVE'}</strong>
-          </span>
-        </div>
+            return (
+              <div
+                key={provider.key}
+                className="bg-[#111622] border border-[#A9C7E5]/10 rounded-xl p-5 space-y-4 flex flex-col justify-between"
+              >
+                <div className="space-y-2">
+                  <div className="flex justify-between items-start">
+                    <div className="flex items-center space-x-3">
+                      <div className="w-10 h-10 bg-[#151D2A] border border-[#A9C7E5]/10 rounded-lg flex items-center justify-center text-lg">
+                        {provider.icon}
+                      </div>
+                      <div>
+                        <h3 className="text-sm font-bold text-white">{provider.name}</h3>
+                        <span className="text-[10px] font-mono text-slate-400 uppercase">{provider.category}</span>
+                      </div>
+                    </div>
 
-        {isLoading ? (
-          <div className="p-8 text-center text-xs font-mono text-slate-500 animate-pulse">
-            Querying provider API tokens and scanning active accounts...
-          </div>
-        ) : accounts.length === 0 ? (
-          <div className="p-8 text-center border border-dashed border-[#A9C7E5]/20 rounded-lg text-xs font-mono text-slate-500">
-            No external provider accounts discovered.
-          </div>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-left border-collapse">
-              <thead>
-                <tr className="border-b border-[#A9C7E5]/10 text-[11px] font-mono text-slate-400 uppercase">
-                  <th className="py-3 px-4">Provider</th>
-                  <th className="py-3 px-4">Account Name</th>
-                  <th className="py-3 px-4">External ID</th>
-                  <th className="py-3 px-4">Type</th>
-                  <th className="py-3 px-4">Status</th>
-                  <th className="py-3 px-4 text-right">Actions</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-[#A9C7E5]/10 text-xs">
-                {accounts.map((acc) => (
-                  <tr key={acc.id} className="hover:bg-[#0B0F17]/50 transition-colors">
-                    <td className="py-3.5 px-4 font-mono font-bold text-[#55A9E6]">
-                      {acc.provider}
-                    </td>
-                    <td className="py-3.5 px-4 font-medium text-white">
-                      {acc.descriptive_name}
-                    </td>
-                    <td className="py-3.5 px-4 font-mono text-slate-400">
-                      {acc.external_account_id}
-                    </td>
-                    <td className="py-3.5 px-4 font-mono text-slate-400 uppercase">
-                      {acc.account_type}
-                    </td>
-                    <td className="py-3.5 px-4">
-                      <span className="px-2 py-0.5 text-[10px] font-mono font-bold rounded bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
-                        {acc.status}
-                      </span>
-                    </td>
-                    <td className="py-3.5 px-4 text-right">
-                      <button
-                        onClick={() => handleMapAccount(acc)}
-                        disabled={mappingId === acc.id}
-                        className="bg-amber-500/10 border border-amber-500/30 text-amber-400 text-[11px] font-mono font-bold px-3 py-1 rounded hover:bg-amber-500/20 transition-all disabled:opacity-50 cursor-pointer"
-                      >
-                        {mappingId === acc.id ? 'MAPPING...' : `MAP TO ${activeClient?.name ? activeClient.name.toUpperCase() : 'CLIENT'}`}
-                      </button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </div>
+                    <span className={`text-[10px] font-mono px-2 py-0.5 rounded border font-bold ${badgeClass}`}>
+                      {label}
+                    </span>
+                  </div>
+
+                  <p className="text-xs text-slate-400">{provider.description}</p>
+                </div>
+
+                <div className="pt-3 border-t border-[#A9C7E5]/10 flex justify-between items-center text-xs font-mono">
+                  <div>
+                    <span className="text-[10px] text-slate-500 block uppercase">MAPPED ID</span>
+                    <span className="text-slate-300 font-bold">{accountId || 'UNMAPPED'}</span>
+                  </div>
+
+                  {accountId ? (
+                    <button
+                      disabled
+                      className="px-3 py-1.5 bg-[#151D2A] text-slate-400 rounded text-[11px] font-bold border border-[#A9C7E5]/10 cursor-not-allowed"
+                    >
+                      CONNECTED
+                    </button>
+                  ) : (
+                    <button className="px-3 py-1.5 bg-[#D99614] hover:bg-[#B97A08] text-[#0B0F17] font-bold rounded text-[11px] transition-all">
+                      MAP ACCOUNT
+                    </button>
+                  )}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </main>
     </div>
   );
 }
