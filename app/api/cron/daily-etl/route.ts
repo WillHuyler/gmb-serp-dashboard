@@ -2,15 +2,25 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { CANONICAL_CLIENTS } from '../../../../lib/client-context';
 
-// Initialize Supabase Admin Client
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL || '',
-  process.env.SUPABASE_SERVICE_ROLE_KEY || ''
-);
-
 export async function GET(req: NextRequest) {
   try {
-    // 1. Verify Cron Secret Header
+    // 1. Lazy-initialize Supabase Client at runtime to prevent build-time missing key errors
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
+    const supabaseServiceKey =
+      process.env.SUPABASE_SERVICE_ROLE_KEY ||
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ||
+      '';
+
+    if (!supabaseUrl || !supabaseServiceKey) {
+      return NextResponse.json(
+        { error: 'SUPABASE_CONFIG_MISSING', message: 'Database environment variables are missing.' },
+        { status: 500 }
+      );
+    }
+
+    const supabase = createClient(supabaseUrl, supabaseServiceKey);
+
+    // 2. Verify Cron Secret Header
     const authHeader = req.headers.get('authorization');
     if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
       return NextResponse.json({ error: 'UNAUTHORIZED_CRON_TRIGGER' }, { status: 401 });
@@ -22,7 +32,7 @@ export async function GET(req: NextRequest) {
 
     const executionLog: Array<{ clientId: string; status: string; recordsUpdated: number }> = [];
 
-    // 2. Iterate through Certified Clients in Canonical Registry
+    // 3. Iterate through Certified Clients in Canonical Registry
     for (const client of CANONICAL_CLIENTS) {
       if (!client.is_certified) {
         executionLog.push({ clientId: client.id, status: 'SKIPPED_UNCERTIFIED', recordsUpdated: 0 });
@@ -65,7 +75,7 @@ export async function GET(req: NextRequest) {
         brightlocalMetrics = await fetchBrightLocalMetrics(client.mappings.brightlocal_location_id, formattedDate);
       }
 
-      // 3. Upsert Compiled Metrics into Supabase
+      // 4. Upsert Compiled Metrics into Supabase
       const { error: upsertError } = await supabase
         .from('daily_client_metrics')
         .upsert(
