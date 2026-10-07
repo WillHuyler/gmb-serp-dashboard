@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { validateClientAccess } from '../../../lib/auth-guard';
-import { CANONICAL_CLIENTS } from '../../../lib/client-context';
+import { validateClientAccess } from '../../../../lib/auth-guard';
+import { CANONICAL_CLIENTS } from '../../../../lib/client-context';
 
 export interface IntegrationSyncPayload {
   clientId: string;
