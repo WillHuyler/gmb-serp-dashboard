@@ -7,7 +7,6 @@ import { useClient } from '../../lib/client-context';
 import GlobalHeader from '../../components/navigation/GlobalHeader';
 import { PlaidInsightsPanel } from '../../components/PlaidInsightsPanel';
 
-// Enforce dynamic execution to support useSearchParams without static pre-render bailout
 export const dynamic = 'force-dynamic';
 
 function CommandCenterContent() {
@@ -51,7 +50,6 @@ function CommandCenterContent() {
 
   return (
     <main className="flex-1 p-6 max-w-7xl w-full mx-auto space-y-6">
-      {/* Top Operational Header */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>
           <span className="text-[10px] font-mono uppercase tracking-widest text-[#D99614] font-bold block">
@@ -84,70 +82,41 @@ function CommandCenterContent() {
         </div>
       </div>
 
-      {/* 10-Second Executive KPI Surface */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        {/* KPI 1: Ad Spend */}
         <div className="bg-[#111622] border border-[#A9C7E5]/10 rounded-xl p-4 space-y-1">
           <span className="text-[10px] font-mono text-slate-400 uppercase font-bold block">TOTAL AD SPEND</span>
           <div className="text-xl font-bold text-white font-mono">
-            {!activeClient?.is_certified
-              ? '—'
-              : loading
-              ? '...'
-              : metrics?.total_spend
-              ? `$${metrics.total_spend.toLocaleString()}`
-              : '$0.00'}
+            {!activeClient?.is_certified ? '—' : loading ? '...' : metrics?.total_spend ? `$${metrics.total_spend.toLocaleString()}` : '$0.00'}
           </div>
           <span className="text-[10px] text-slate-500 block">
             {!activeClient?.is_certified ? 'CONNECTION REQUIRED' : 'Google Ads + Meta Ads'}
           </span>
         </div>
 
-        {/* KPI 2: GA4 Sessions */}
         <div className="bg-[#111622] border border-[#A9C7E5]/10 rounded-xl p-4 space-y-1">
           <span className="text-[10px] font-mono text-slate-400 uppercase font-bold block">WEB SESSIONS (GA4)</span>
           <div className="text-xl font-bold text-white font-mono">
-            {!activeClient?.is_certified
-              ? '—'
-              : loading
-              ? '...'
-              : metrics?.ga4_sessions
-              ? metrics.ga4_sessions.toLocaleString()
-              : '0'}
+            {!activeClient?.is_certified ? '—' : loading ? '...' : metrics?.ga4_sessions ? metrics.ga4_sessions.toLocaleString() : '0'}
           </div>
           <span className="text-[10px] text-slate-500 block">
             {!activeClient?.is_certified ? 'PROPERTY UNMAPPED' : 'GA4 Analytics'}
           </span>
         </div>
 
-        {/* KPI 3: GSC Organic Clicks */}
         <div className="bg-[#111622] border border-[#A9C7E5]/10 rounded-xl p-4 space-y-1">
           <span className="text-[10px] font-mono text-slate-400 uppercase font-bold block">ORGANIC CLICKS (GSC)</span>
           <div className="text-xl font-bold text-white font-mono">
-            {!activeClient?.is_certified
-              ? '—'
-              : loading
-              ? '...'
-              : metrics?.gsc_clicks
-              ? metrics.gsc_clicks.toLocaleString()
-              : '0'}
+            {!activeClient?.is_certified ? '—' : loading ? '...' : metrics?.gsc_clicks ? metrics.gsc_clicks.toLocaleString() : '0'}
           </div>
           <span className="text-[10px] text-slate-500 block">
             {!activeClient?.is_certified ? 'PROPERTY UNMAPPED' : 'Search Console'}
           </span>
         </div>
 
-        {/* KPI 4: Local SERP Rank */}
         <div className="bg-[#111622] border border-[#A9C7E5]/10 rounded-xl p-4 space-y-1">
           <span className="text-[10px] font-mono text-slate-400 uppercase font-bold block">AVG MAP RANK</span>
           <div className="text-xl font-bold text-[#D99614] font-mono">
-            {!activeClient?.mappings?.brightlocal_location_id
-              ? '—'
-              : loading
-              ? '...'
-              : metrics?.avg_map_rank
-              ? `#${metrics.avg_map_rank}`
-              : '—'}
+            {!activeClient?.mappings?.brightlocal_location_id ? '—' : loading ? '...' : metrics?.avg_map_rank ? `#${metrics.avg_map_rank}` : '—'}
           </div>
           <span className="text-[10px] text-slate-500 block">
             {!activeClient?.mappings?.brightlocal_location_id ? 'OTTERWATCH UNMAPPED' : 'OtterWatch 5x5 Grid'}
@@ -155,7 +124,6 @@ function CommandCenterContent() {
         </div>
       </div>
 
-      {/* AI Intelligence Ledger */}
       <PlaidInsightsPanel />
     </main>
   );
