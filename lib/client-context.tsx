@@ -20,6 +20,9 @@ export interface ClientProfile {
   };
 }
 
+// Backwards-compatible type alias for existing component imports
+export type Client = ClientProfile;
+
 export const AUTHORITATIVE_CLIENT_REGISTRY: ClientProfile[] = [
   {
     id: 'bf93fef0-fc60-4119-8ea2-68a274984355',
@@ -117,6 +120,7 @@ interface ClientContextType {
   setActiveClientId: (id: string) => void;
   clientRegistry: ClientProfile[];
   clients: ClientProfile[];
+  availableClients: ClientProfile[];
 }
 
 const ClientContext = createContext<ClientContextType>({
@@ -125,6 +129,7 @@ const ClientContext = createContext<ClientContextType>({
   setActiveClientId: () => {},
   clientRegistry: AUTHORITATIVE_CLIENT_REGISTRY,
   clients: AUTHORITATIVE_CLIENT_REGISTRY,
+  availableClients: AUTHORITATIVE_CLIENT_REGISTRY,
 });
 
 export function ClientProvider({ children }: { children: React.ReactNode }) {
@@ -145,6 +150,7 @@ export function ClientProvider({ children }: { children: React.ReactNode }) {
         setActiveClientId,
         clientRegistry: AUTHORITATIVE_CLIENT_REGISTRY,
         clients: AUTHORITATIVE_CLIENT_REGISTRY,
+        availableClients: AUTHORITATIVE_CLIENT_REGISTRY,
       }}
     >
       {children}
