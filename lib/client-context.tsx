@@ -1,127 +1,127 @@
 'use client';
 
-import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import React, { createContext, useContext, useState, useEffect } from 'react';
 
-export interface Client {
+export interface ClientProfile {
   id: string;
-  tenant_id: string;
   name: string;
   is_certified: boolean;
-  mappings?: {
-    gmb_account_id?: string;
+  service_areas: string[];
+  mappings: {
     google_ads_id?: string;
+    meta_act_id?: string;
     ga4_property_id?: string;
     gsc_site_url?: string;
-    meta_act_id?: string;
+    gmb_account_id?: string;
+    brightlocal_location_id?: string;
     bing_webmaster_site_url?: string;
     clarity_project_id?: string;
-    brightlocal_location_id?: string;
   };
 }
 
-// Canonical Client Registry
-export const CANONICAL_CLIENTS: Client[] = [
-  {
-    id: 'a1b2c3d4-e5f6-7890-abcd-ef1234567890',
-    tenant_id: '00000000-0000-0000-0000-000000000001',
-    name: 'ABC Motors',
-    is_certified: false,
-    mappings: {
-      gmb_account_id: 'gmb_abc_motors_01',
-      brightlocal_location_id: 'bl_abc_motors_01',
-    },
-  },
+export const AUTHORITATIVE_CLIENT_REGISTRY: ClientProfile[] = [
   {
     id: 'bf93fef0-fc60-4119-8ea2-68a274984355',
-    tenant_id: '00000000-0000-0000-0000-000000000001',
-    name: 'High Rise Chimney Sweep & Service',
+    name: 'High Rise Chimney Sweep',
     is_certified: true,
+    service_areas: ['53202', '53203', '53211', '53217'],
     mappings: {
-      gmb_account_id: 'gmb_highrise_01',
-      google_ads_id: 'ads_highrise_9821',
-      ga4_property_id: 'ga4_highrise_3311',
+      google_ads_id: '123-456-7890',
+      meta_act_id: 'act_987654321',
+      ga4_property_id: '304958612',
       gsc_site_url: 'https://highrisechimney.com',
-      meta_act_id: 'act_highrise_2209',
+      gmb_account_id: 'gmb_hr_sweep_01',
+      brightlocal_location_id: 'bl_loc_highrise_53202',
       bing_webmaster_site_url: 'https://highrisechimney.com',
-      clarity_project_id: 'ms_clarity_hr_881',
-      brightlocal_location_id: 'bl_highrise_01',
+      clarity_project_id: 'clr_highrise_99',
     },
   },
   {
     id: 'c2d3e4f5-a6b7-8901-bcde-f23456789012',
-    tenant_id: '00000000-0000-0000-0000-000000000001',
     name: 'Apex Dental Group',
     is_certified: true,
+    service_areas: ['90210', '90211', '90212'],
     mappings: {
-      gmb_account_id: 'gmb_apexdental_01',
-      ga4_property_id: 'ga4_apexdental_1029',
-      clarity_project_id: 'ms_clarity_apex_441',
+      google_ads_id: '234-567-8901',
+      meta_act_id: 'act_876543210',
+      ga4_property_id: '405968723',
+      gsc_site_url: 'https://apexdentalgroup.com',
+      gmb_account_id: 'gmb_apex_dental_02',
+      brightlocal_location_id: 'bl_loc_apex_90210',
     },
   },
   {
     id: 'd3e4f5a6-b7c8-9012-cdef-345678901234',
-    tenant_id: '00000000-0000-0000-0000-000000000001',
     name: 'Kelly Hyundai',
     is_certified: true,
+    service_areas: ['18015', '18017', '18018'],
     mappings: {
-      gmb_account_id: 'gmb_kellyhyundai_01',
-      google_ads_id: 'ads_kellyhyundai_4412',
-      ga4_property_id: 'ga4_kellyhyundai_9012',
-      bing_webmaster_site_url: 'https://kellyhyundai.com',
+      google_ads_id: '345-678-9012',
+      meta_act_id: 'act_765432109',
+      ga4_property_id: '506978834',
+      gsc_site_url: 'https://kellyhyundai.com',
+      gmb_account_id: 'gmb_kelly_hyundai_03',
+      brightlocal_location_id: 'bl_loc_kelly_18015',
     },
+  },
+  {
+    id: 'e4f5a6b7-c8d9-0123-def0-456789012345',
+    name: 'DIMG Digital Marketing Group',
+    is_certified: true,
+    service_areas: ['10001', '10002', '10003'],
+    mappings: {
+      google_ads_id: '456-789-0123',
+      meta_act_id: 'act_654321098',
+      ga4_property_id: '607989945',
+      gsc_site_url: 'https://dimgmarketing.com',
+      gmb_account_id: 'gmb_dimg_group_04',
+      brightlocal_location_id: 'bl_loc_dimg_10001',
+    },
+  },
+  {
+    id: 'f5a6b7c8-d9e0-1234-ef01-567890123456',
+    name: 'FM Local Services',
+    is_certified: true,
+    service_areas: ['75001', '75002', '75006'],
+    mappings: {
+      google_ads_id: '567-890-1234',
+      meta_act_id: 'act_543210987',
+      ga4_property_id: '708990056',
+      gsc_site_url: 'https://fmlocalservices.com',
+      gmb_account_id: 'gmb_fm_local_05',
+      brightlocal_location_id: 'bl_loc_fm_75001',
+    },
+  },
+  {
+    id: 'a1b2c3d4-e5f6-7890-abcd-ef1234567890',
+    name: 'ABC Motors',
+    is_certified: false,
+    service_areas: ['30301', '30302'],
+    mappings: {},
   },
 ];
 
 interface ClientContextType {
-  activeClient: Client | null;
-  availableClients: Client[];
-  clients: Client[]; // Alias for backward compatibility
-  setActiveClient: (client: Client) => void;
-  setActiveClientId: (id: string) => void;
-  isLoading: boolean;
+  activeClient: ClientProfile | null;
+  setActiveClient: (client: ClientProfile) => void;
+  clientRegistry: ClientProfile[];
 }
 
-const ClientContext = createContext<ClientContextType | undefined>(undefined);
+const ClientContext = createContext<ClientContextType>({
+  activeClient: AUTHORITATIVE_CLIENT_REGISTRY[0],
+  setActiveClient: () => {},
+  clientRegistry: AUTHORITATIVE_CLIENT_REGISTRY,
+});
 
-export function ClientProvider({ children }: { children: ReactNode }) {
-  const [activeClient, setActiveClientState] = useState<Client | null>(CANONICAL_CLIENTS[0]);
-  const [isLoading, setIsLoading] = useState<boolean>(false);
-
-  useEffect(() => {
-    const savedClientId = typeof window !== 'undefined' ? localStorage.getItem('porchlight_active_client_id') : null;
-    if (savedClientId) {
-      const match = CANONICAL_CLIENTS.find((c) => c.id === savedClientId);
-      if (match) {
-        setActiveClientState(match);
-      }
-    }
-  }, []);
-
-  const setActiveClient = (client: Client) => {
-    setIsLoading(true);
-    setActiveClientState(client);
-    if (typeof window !== 'undefined') {
-      localStorage.setItem('porchlight_active_client_id', client.id);
-    }
-    setTimeout(() => setIsLoading(false), 150);
-  };
-
-  const setActiveClientId = (id: string) => {
-    const match = CANONICAL_CLIENTS.find((c) => c.id === id);
-    if (match) {
-      setActiveClient(match);
-    }
-  };
+export function ClientProvider({ children }: { children: React.ReactNode }) {
+  const [activeClient, setActiveClient] = useState<ClientProfile>(AUTHORITATIVE_CLIENT_REGISTRY[0]);
 
   return (
     <ClientContext.Provider
       value={{
         activeClient,
-        availableClients: CANONICAL_CLIENTS,
-        clients: CANONICAL_CLIENTS,
         setActiveClient,
-        setActiveClientId,
-        isLoading,
+        clientRegistry: AUTHORITATIVE_CLIENT_REGISTRY,
       }}
     >
       {children}
@@ -130,9 +130,5 @@ export function ClientProvider({ children }: { children: ReactNode }) {
 }
 
 export function useClient() {
-  const context = useContext(ClientContext);
-  if (!context) {
-    throw new Error('useClient must be used within a ClientProvider');
-  }
-  return context;
+  return useContext(ClientContext);
 }
