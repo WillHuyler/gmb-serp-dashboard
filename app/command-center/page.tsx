@@ -2,14 +2,19 @@
 
 import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
+import { useSearchParams } from 'next/navigation';
 import { useClient } from '../../lib/client-context';
 import GlobalHeader from '../../components/navigation/GlobalHeader';
 import { PlaidInsightsPanel } from '../../components/PlaidInsightsPanel';
 
 export default function CommandCenterPage() {
   const { activeClient } = useClient();
+  const searchParams = useSearchParams();
   const [metrics, setMetrics] = useState<any>(null);
   const [loading, setLoading] = useState<boolean>(true);
+
+  const startDate = searchParams.get('startDate') || '2026-09-01';
+  const endDate = searchParams.get('endDate') || '2026-09-30';
 
   useEffect(() => {
     if (!activeClient) {
@@ -21,8 +26,10 @@ export default function CommandCenterPage() {
     async function fetchClientMetrics() {
       try {
         setLoading(true);
-        // Query server-side scoped metrics endpoint with active client ID
-        const res = await fetch(`/api/telemetry/aggregate?clientId=${activeClient.id}`);
+        // Query server-side scoped metrics endpoint with active client ID + date range bounds
+        const res = await fetch(
+          `/api/telemetry/aggregate?clientId=${activeClient.id}&startDate=${startDate}&endDate=${endDate}`
+        );
         const data = await res.json();
         if (data.success) {
           setMetrics(data.metrics);
@@ -38,7 +45,7 @@ export default function CommandCenterPage() {
     }
 
     fetchClientMetrics();
-  }, [activeClient]);
+  }, [activeClient, startDate, endDate]);
 
   return (
     <div className="min-h-screen bg-[#0B0F17] text-white flex flex-col font-sans">
