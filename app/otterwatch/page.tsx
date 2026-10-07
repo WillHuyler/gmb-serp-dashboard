@@ -24,7 +24,6 @@ function OtterWatchContent() {
 
   return (
     <main className="flex-1 p-6 max-w-7xl w-full mx-auto space-y-6">
-      {/* Top Header & Provenance Status */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>
           <span className="text-[10px] font-mono uppercase tracking-widest text-[#D99614] font-bold block">
@@ -49,7 +48,6 @@ function OtterWatchContent() {
         </div>
       </div>
 
-      {/* Fail-Closed State for Unmapped / Uncertified Clients */}
       {!isLive ? (
         <div className="p-8 rounded-xl bg-[#111622] border border-[#A9C7E5]/10 text-center space-y-3">
           <span className="text-amber-400 text-xs font-mono tracking-widest uppercase block font-bold">
@@ -61,9 +59,8 @@ function OtterWatchContent() {
           </p>
         </div>
       ) : (
-        /* Live Telemetry Surface with Provenance Metadata */
         <div className="space-y-6">
-          {/* Provenance Metadata Strip */}
+          {/* Provenance Strip */}
           <div className="bg-[#111622] border border-[#A9C7E5]/10 rounded-xl p-4 grid grid-cols-2 md:grid-cols-4 gap-4 text-xs font-mono">
             <div>
               <span className="text-slate-500 block uppercase text-[10px]">BRIGHTLOCAL ID</span>
@@ -83,7 +80,6 @@ function OtterWatchContent() {
             </div>
           </div>
 
-          {/* KPI Summary Cards */}
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             <div className="bg-[#111622] border border-[#A9C7E5]/10 rounded-xl p-4 space-y-1">
               <span className="text-[10px] font-mono text-slate-400 uppercase font-bold block">AVERAGE MAP RANK</span>
@@ -102,7 +98,6 @@ function OtterWatchContent() {
             </div>
           </div>
 
-          {/* 5x5 Geo-Grid Representation */}
           <div className="bg-[#111622] border border-[#A9C7E5]/10 rounded-xl p-6 space-y-4">
             <h3 className="text-sm font-bold text-white uppercase tracking-wider font-mono">
               5x5 GEO-GRID POSITION MATRIX
