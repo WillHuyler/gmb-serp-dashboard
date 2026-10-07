@@ -55,7 +55,7 @@ export default function CommandCenterPage() {
               {activeClient?.name || 'No Client Selected'}
             </h1>
             <p className="text-xs text-slate-400 mt-0.5">
-              Tenant Domain: <span className="text-slate-200 font-mono">{activeClient?.domain || 'unassigned'}</span>
+              Client ID: <span className="text-slate-200 font-mono">{activeClient?.id || 'unassigned'}</span>
             </p>
           </div>
 
