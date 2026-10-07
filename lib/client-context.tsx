@@ -1,6 +1,6 @@
 'use client';
 
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState } from 'react';
 
 export interface ClientProfile {
   id: string;
@@ -100,6 +100,9 @@ export const AUTHORITATIVE_CLIENT_REGISTRY: ClientProfile[] = [
     mappings: {},
   },
 ];
+
+// Backwards-compatible alias for existing API route imports
+export const CANONICAL_CLIENTS = AUTHORITATIVE_CLIENT_REGISTRY;
 
 interface ClientContextType {
   activeClient: ClientProfile | null;
