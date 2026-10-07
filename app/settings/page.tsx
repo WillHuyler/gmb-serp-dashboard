@@ -11,7 +11,6 @@ function SettingsContent() {
 
   return (
     <main className="flex-1 p-6 max-w-7xl w-full mx-auto space-y-6">
-      {/* Page Header */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>
           <span className="text-[10px] font-mono uppercase tracking-widest text-[#D99614] font-bold block">
@@ -37,16 +36,15 @@ function SettingsContent() {
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        {/* Active Client Mapping ID Ledger */}
         <div className="bg-[#111622] border border-[#A9C7E5]/10 rounded-xl p-5 space-y-4">
           <h3 className="text-sm font-bold text-white uppercase font-mono tracking-wider">
             CANONICAL PROVIDER MAPPINGS
           </h3>
-          
+
           <div className="space-y-3 text-xs font-mono">
             <div className="flex justify-between py-2 border-b border-[#A9C7E5]/10">
-              <span className="text-slate-400">CLIENT ID</span>
-              <span className="text-white font-bold">{activeClient?.id || 'UNASSIGNED'}</span>
+              <span className="text-slate-400">CLIENT NAME</span>
+              <span className="text-white font-bold">{activeClient?.name || 'UNASSIGNED'}</span>
             </div>
             <div className="flex justify-between py-2 border-b border-[#A9C7E5]/10">
               <span className="text-slate-400">GOOGLE ADS ID</span>
@@ -69,9 +67,17 @@ function SettingsContent() {
               <span className="text-slate-200">{activeClient?.mappings?.brightlocal_location_id || 'UNMAPPED'}</span>
             </div>
           </div>
+
+          <details className="mt-4 border-t border-[#A9C7E5]/10 pt-3">
+            <summary className="text-[10px] font-mono text-slate-500 cursor-pointer hover:text-slate-300">
+              SHOW INTERNAL DIAGNOSTIC UUIDs
+            </summary>
+            <div className="mt-2 p-2 bg-[#0B0F17] rounded text-[10px] font-mono text-slate-400 space-y-1">
+              <div>Internal Client ID: {activeClient?.id}</div>
+            </div>
+          </details>
         </div>
 
-        {/* System Diagnostics & Environment Secrets Status */}
         <div className="bg-[#111622] border border-[#A9C7E5]/10 rounded-xl p-5 space-y-4">
           <h3 className="text-sm font-bold text-white uppercase font-mono tracking-wider">
             ENVIRONMENT & API SECRETS HEALTH
