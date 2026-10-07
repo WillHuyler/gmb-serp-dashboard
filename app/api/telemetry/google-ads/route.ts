@@ -3,20 +3,26 @@ import { createClient } from '@supabase/supabase-js';
 import { validateClientAccess } from '../../../../lib/auth-guard';
 import { CANONICAL_CLIENTS } from '../../../../lib/client-context';
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
-const supabaseKey =
-  process.env.SUPABASE_SERVICE_ROLE_KEY ||
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ||
-  '';
-
-const supabase = createClient(supabaseUrl, supabaseKey);
-
 export async function POST(req: NextRequest) {
   try {
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
+    const supabaseKey =
+      process.env.SUPABASE_SERVICE_ROLE_KEY ||
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ||
+      '';
+
+    if (!supabaseUrl || !supabaseKey) {
+      return NextResponse.json(
+        { success: false, error: 'SUPABASE_CONFIG_MISSING', message: 'Database environment variables are missing.' },
+        { status: 500 }
+      );
+    }
+
+    const supabase = createClient(supabaseUrl, supabaseKey);
     const body = await req.json();
     const { clientId, startDate, endDate, rawTelemetry } = body;
 
-    // 1. Enforce Server-Side Tenant & Client Scoping Security Gate
+    // 1. Enforce Server-Side Tenant Scoping Security Gate
     const authCheck = await validateClientAccess(req, clientId || undefined);
     if (!authCheck.authorized) {
       return authCheck.errorResponse || NextResponse.json({ error: 'FORBIDDEN' }, { status: 403 });
@@ -40,7 +46,7 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // 3. Verify Google Ads Provider Account Mapping
+    // 3. Verify Google Ads Account Mapping
     const googleAdsId = activeClient.mappings?.google_ads_id;
     if (!googleAdsId) {
       return NextResponse.json(
@@ -54,18 +60,17 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // 4. Generate Provenance Batch Metadata
+    // 4. Batch Provenance Metadata
     const ingestionRunId = `ingest_gads_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
     const metricDate = startDate || new Date().toISOString().split('T')[0];
 
-    // Normalize Metrics Payload
     const spend = rawTelemetry?.spend ?? 0;
     const impressions = rawTelemetry?.impressions ?? 0;
     const clicks = rawTelemetry?.clicks ?? 0;
     const conversions = rawTelemetry?.conversions ?? 0;
 
-    // 5. Upsert Telemetry into Supabase
-    const { data, error: dbError } = await supabase
+    // 5. Database Mutation
+    const { error: dbError } = await supabase
       .from('paid_media_telemetry')
       .upsert(
         {
@@ -86,14 +91,13 @@ export async function POST(req: NextRequest) {
       );
 
     if (dbError) {
-      console.error('Database Ingestion Write Error:', dbError);
+      console.error('Database Write Error:', dbError);
       return NextResponse.json(
         { success: false, error: 'DATABASE_WRITE_FAILED', message: dbError.message },
         { status: 500 }
       );
     }
 
-    // 6. Return Standard Certification & Provenance Response Schema
     return NextResponse.json({
       success: true,
       status: activeClient.is_certified ? 'CERTIFIED_INGESTION_COMPLETE' : 'UNCERTIFIED_BASELINE_INGESTED',
