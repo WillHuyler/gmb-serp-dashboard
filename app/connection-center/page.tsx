@@ -205,7 +205,7 @@ function ConnectionCenterContent() {
 
   return (
     <main className="flex-1 p-8 space-y-8 max-w-7xl w-full mx-auto">
-      <div className="flex justify-between items-center border-b border-[#A9C7E5]/10 pb-6">
+      <div className="flex justify-between items-center border-b border-[#A9C7E5]/10 pb-8">
         <div>
           <h1 className="text-2xl font-bold tracking-tight font-mono text-white">CONNECTION CENTER</h1>
           <p className="text-sm text-slate-400 mt-1">
@@ -260,41 +260,4 @@ function ConnectionCenterContent() {
           providerKey="gsc"
           mappedValue={activeClient?.mappings?.gsc_site_url}
           lastSync="Oct 11 15:48 EDT"
-          isCertified={Boolean(activeClient?.is_certified && activeClient?.mappings?.gsc_site_url)}
-          discoveredResources={[
-            { id: 'https://highrisechimney.com', name: 'High Rise Chimney (URL Prefix)', type: 'URL_PREFIX', context: 'URL Prefix' },
-            { id: 'sc-domain:highrisechimney.com', name: 'highrisechimney.com (Domain Property)', type: 'DOMAIN_PROPERTY', context: 'Domain Property' },
-          ]}
-          onSelectResource={(id) => handleSelectResource('gsc', id)}
-          onSyncNow={() => handleSyncNow('gsc')}
-        />
-
-        <ProviderCard
-          title="Bing Webmaster Tools"
-          providerKey="bing_webmaster"
-          mappedValue={activeClient?.mappings?.bing_webmaster_site_url}
-          lastSync="Oct 11 15:48 EDT"
-          isCertified={Boolean(activeClient?.is_certified && activeClient?.mappings?.bing_webmaster_site_url)}
-          discoveredResources={[
-            { id: 'https://highrisechimney.com', name: 'High Rise Chimney Sweep (Verified Site)', type: 'VERIFIED_SITE' },
-          ]}
-          onSelectResource={(id) => handleSelectResource('bing_webmaster', id)}
-          onSyncNow={() => handleSyncNow('bing_webmaster')}
-        />
-      </div>
-    </main>
-  );
-}
-
-export default function ConnectionCenterPage() {
-  return (
-    <div className="min-h-screen bg-[#0B0F17] text-white flex flex-col font-sans">
-      <Suspense fallback={<div className="p-6 text-xs text-slate-400 font-mono">Loading Header...</div>}>
-        <GlobalHeader />
-      </Suspense>
-      <Suspense fallback={<div className="p-6 text-xs text-slate-400 font-mono">Loading Connection Center...</div>}>
-        <ConnectionCenterContent />
-      </Suspense>
-    </div>
-  );
-}
+          isCertified={Boolean(
