@@ -260,4 +260,21 @@ function ConnectionCenterContent() {
           providerKey="gsc"
           mappedValue={activeClient?.mappings?.gsc_site_url}
           lastSync="Oct 11 15:48 EDT"
-          isCertified={Boolean(
+          isCertified={Boolean(activeClient?.is_certified && activeClient?.mappings?.gsc_site_url)}
+          discoveredResources={[
+            { id: 'https://highrisechimney.com', name: 'High Rise Chimney (URL Prefix)', type: 'URL_PREFIX', context: 'URL Prefix' },
+            { id: 'sc-domain:highrisechimney.com', name: 'highrisechimney.com (Domain Property)', type: 'DOMAIN_PROPERTY', context: 'Domain Property' },
+          ]}
+          onSelectResource={(id) => handleSelectResource('gsc', id)}
+          onSyncNow={() => handleSyncNow('gsc')}
+        />
+
+        <ProviderCard
+          title="Bing Webmaster Tools"
+          providerKey="bing_webmaster"
+          mappedValue={activeClient?.mappings?.bing_webmaster_site_url}
+          lastSync="Oct 11 15:48 EDT"
+          isCertified={Boolean(activeClient?.is_certified && activeClient?.mappings?.bing_webmaster_site_url)}
+          discoveredResources={[
+            { id: 'https://highrisechimney.com', name: 'High Rise Chimney Sweep (Verified Site)', type: 'VERIFIED_SITE' },
+          ]}
