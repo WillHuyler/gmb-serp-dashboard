@@ -28,7 +28,7 @@ export interface ClientMappings {
 
 export interface ClientProfile {
   id: string;
-  tenant_id: string;
+  tenant_id?: string;
   name: string;
   is_certified: boolean;
   service_areas?: string[];
@@ -90,6 +90,28 @@ export const AUTHORITATIVE_CLIENT_REGISTRY: ClientProfile[] = [
       google_ads_id: 'ads_kellyhyundai_4412',
       ga4_property_id: 'ga4_kellyhyundai_9012',
       bing_webmaster_site_url: 'https://kellyhyundai.com',
+    },
+  },
+  {
+    id: 'e4f5a6b7-c8d9-0123-def0-456789012345',
+    tenant_id: '00000000-0000-0000-0000-000000000001',
+    name: 'CarBahn Corporate Office',
+    is_certified: true,
+    service_areas: ['94025'],
+    mappings: {
+      gmb_account_id: 'gmb_carbahn_corp_01',
+      gmb_location_id: 'loc_carbahn_94025',
+    },
+  },
+  {
+    id: 'f5a6b7c8-d9e0-1234-ef01-567890123456',
+    tenant_id: '00000000-0000-0000-0000-000000000001',
+    name: 'CarBahn Service & Repair Center',
+    is_certified: true,
+    service_areas: ['94025', '94026'],
+    mappings: {
+      gmb_account_id: 'gmb_carbahn_service_02',
+      gmb_location_id: 'loc_carbahn_svc_94025',
     },
   },
 ];
