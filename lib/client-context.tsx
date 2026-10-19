@@ -31,6 +31,7 @@ export interface Client {
   tenant_id: string;
   name: string;
   is_certified: boolean;
+  service_areas?: string[];
   mappings?: ClientMappings;
 }
 
@@ -40,6 +41,7 @@ export const CANONICAL_CLIENTS: Client[] = [
     tenant_id: '00000000-0000-0000-0000-000000000001',
     name: 'ABC Motors',
     is_certified: false,
+    service_areas: ['53202', '53203', '53211'],
     mappings: {
       gmb_account_id: 'gmb_abc_motors_01',
       brightlocal_location_id: 'bl_abc_motors_01',
@@ -50,6 +52,7 @@ export const CANONICAL_CLIENTS: Client[] = [
     tenant_id: '00000000-0000-0000-0000-000000000001',
     name: 'High Rise Chimney Sweep & Service',
     is_certified: true,
+    service_areas: ['53202', '53203', '53211', '53217'],
     mappings: {
       gmb_account_id: 'gmb_highrise_01',
       gmb_location_id: 'loc_highrise_53202',
@@ -67,6 +70,7 @@ export const CANONICAL_CLIENTS: Client[] = [
     tenant_id: '00000000-0000-0000-0000-000000000001',
     name: 'Apex Dental Group',
     is_certified: true,
+    service_areas: ['18301', '18302'],
     mappings: {
       gmb_account_id: 'gmb_apexdental_01',
       ga4_property_id: 'ga4_apexdental_1029',
@@ -78,6 +82,7 @@ export const CANONICAL_CLIENTS: Client[] = [
     tenant_id: '00000000-0000-0000-0000-000000000001',
     name: 'Kelly Hyundai of Stroudsburg',
     is_certified: true,
+    service_areas: ['18360', '18301'],
     mappings: {
       gmb_account_id: 'gmb_kellyhyundai_01',
       google_ads_id: 'ads_kellyhyundai_4412',
@@ -91,6 +96,7 @@ interface ClientContextType {
   activeClient: Client | null;
   availableClients: Client[];
   clients: Client[];
+  clientRegistry: Client[]; // Added alias to fulfill useClient() destructuring in app/command-center/page.tsx
   setActiveClient: (client: Client) => void;
   setActiveClientId: (id: string) => void;
   isLoading: boolean;
@@ -134,6 +140,7 @@ export function ClientProvider({ children }: { children: ReactNode }) {
         activeClient,
         availableClients: CANONICAL_CLIENTS,
         clients: CANONICAL_CLIENTS,
+        clientRegistry: CANONICAL_CLIENTS,
         setActiveClient,
         setActiveClientId,
         isLoading,
