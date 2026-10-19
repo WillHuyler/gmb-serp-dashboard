@@ -1,64 +1,96 @@
 'use client';
 
 import React from 'react';
-import { useRouter, useSearchParams } from 'next/navigation';
+import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { useClient } from '../../lib/client-context';
 
 export default function GlobalHeader() {
   const router = useRouter();
+  const pathname = usePathname();
   const searchParams = useSearchParams();
-  const { activeClient, setActiveClient, clientRegistry } = useClient();
 
-  const handleClientChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    const selectedId = e.target.value;
-    const client = clientRegistry.find((c) => c.id === selectedId);
-    if (client) {
-      // Clear localStorage/sessionStorage cache entries to eliminate residue
-      if (typeof window !== 'undefined') {
-        localStorage.removeItem(`pl_insights_${activeClient?.id}`);
-        sessionStorage.removeItem(`pl_telemetry_${activeClient?.id}`);
-      }
+  const { activeClient, clients, setActiveClientId } = useClient();
 
-      setActiveClient(client);
+  const handleDatePresetChange = (preset: string) => {
+    const params = new URLSearchParams(searchParams?.toString() || '');
+    const today = new Date();
+    let startDate = '';
+    let endDate = today.toISOString().split('T')[0];
 
-      // Atomic URL update with new client context
-      const params = new URLSearchParams();
-      params.set('clientId', client.id);
-      params.set('startDate', searchParams.get('startDate') || '2026-09-01');
-      params.set('endDate', searchParams.get('endDate') || '2026-09-30');
-      
-      router.push(`?${params.toString()}`);
+    if (preset === '7D') {
+      const d = new Date();
+      d.setDate(d.getDate() - 7);
+      startDate = d.toISOString().split('T')[0];
+    } else if (preset === '30D') {
+      const d = new Date();
+      d.setDate(d.getDate() - 30);
+      startDate = d.toISOString().split('T')[0];
+    } else if (preset === 'MTD') {
+      startDate = new Date(today.getFullYear(), today.getMonth(), 1).toISOString().split('T')[0];
+    } else if (preset === 'QTD') {
+      const quarterMonth = Math.floor(today.getMonth() / 3) * 3;
+      startDate = new Date(today.getFullYear(), quarterMonth, 1).toISOString().split('T')[0];
     }
+
+    params.set('startDate', startDate);
+    params.set('endDate', endDate);
+    router.push(`${pathname}?${params.toString()}`);
+  };
+
+  const handleClientChange = (clientId: string) => {
+    setActiveClientId(clientId);
+    const params = new URLSearchParams(searchParams?.toString() || '');
+    params.set('clientId', clientId);
+    router.push(`${pathname}?${params.toString()}`);
   };
 
   return (
-    <header className="h-16 bg-[#111622] border-b border-[#A9C7E5]/10 px-6 flex items-center justify-between sticky top-0 z-50 font-mono text-xs text-white">
-      <div className="flex items-center space-x-6">
-        <div className="flex items-center space-x-2">
-          <div className="w-7 h-7 bg-[#D99614]/20 border border-[#D99614] rounded flex items-center justify-center font-bold text-[#D99614]">
-            PL
-          </div>
-          <span className="font-bold tracking-wider text-sm">PORCHLIGHT</span>
-        </div>
-
-        <div className="flex items-center space-x-2">
-          <span className="text-slate-400 uppercase text-[10px]">CLIENT:</span>
+    <header className="h-16 bg-white border-b border-[#DCE5EF] px-6 flex items-center justify-between sticky top-0 z-20">
+      <div className="flex items-center space-x-4 flex-1 max-w-2xl">
+        <div className="relative w-64">
           <select
             value={activeClient?.id || ''}
-            onChange={handleClientChange}
-            className="bg-[#151D2A] text-white font-bold border border-[#A9C7E5]/20 rounded px-3 py-1.5 focus:outline-none focus:border-[#D99614]"
+            onChange={(e) => handleClientChange(e.target.value)}
+            className="w-full bg-[#F4F7FB] border border-[#DCE5EF] rounded-lg px-3 py-2 text-xs font-bold text-[#0B1F3A] focus:outline-none focus:border-[#D99614] cursor-pointer"
           >
-            {clientRegistry.map((c) => (
-              <option key={c.id} value={c.id}>
-                {c.name} {c.is_certified ? '✓' : '(Uncertified)'}
+            {clients.map((client) => (
+              <option key={client.id} value={client.id}>
+                {client.name} {client.is_certified ? '(Certified)' : '(Uncertified)'}
               </option>
             ))}
           </select>
         </div>
+
+        <div className="relative flex-1">
+          <input
+            type="text"
+            placeholder="Search locations or keywords... (Ctrl K)"
+            className="w-full bg-[#F4F7FB] border border-[#DCE5EF] rounded-lg pl-9 pr-4 py-2 text-xs text-[#0B1F3A] focus:outline-none focus:border-[#D99614]"
+          />
+          <span className="absolute left-3 top-2.5 text-slate-400 text-xs">🔍</span>
+        </div>
       </div>
 
-      <div className="flex items-center space-x-3 text-slate-300">
-        <span>📍 Service Area: <strong className="text-white">{activeClient?.service_areas.join(', ') || 'None'}</strong></span>
+      <div className="flex items-center space-x-4">
+        <div className="flex items-center space-x-1 bg-[#F4F7FB] border border-[#DCE5EF] rounded-lg p-1">
+          {['7D', '30D', 'MTD', 'QTD'].map((preset) => (
+            <button
+              key={preset}
+              onClick={() => handleDatePresetChange(preset)}
+              className="px-2.5 py-1 text-[10px] font-mono font-bold text-[#0B1F3A] hover:bg-white rounded transition-all"
+            >
+              {preset}
+            </button>
+          ))}
+        </div>
+
+        <div className="text-right">
+          <span className="text-xs font-bold text-[#0B1F3A] block">Will Huyler</span>
+          <span className="text-[10px] font-mono text-slate-400 uppercase block">Agency Admin</span>
+        </div>
+        <div className="w-8 h-8 rounded-full bg-[#0B1F3A] text-white flex items-center justify-center font-bold text-xs">
+          WH
+        </div>
       </div>
     </header>
   );
