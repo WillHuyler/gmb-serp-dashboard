@@ -59,7 +59,7 @@ function ProviderCard({
     }
     return isCertified
       ? { label: 'HEALTHY', color: 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30' }
-      : { label: 'MAPPED', color: 'bg-blue-500/20 text-blue-400 border-blue-500/30' };
+      : { label: 'MAPPED', color: 'bg-blue-500/20 text-blue-400 border-blue-500/20' };
   };
 
   const status = getStatus();
@@ -263,4 +263,29 @@ function ConnectionCenterContent() {
           isCertified={Boolean(activeClient?.is_certified && activeClient?.mappings?.gsc_site_url)}
           discoveredResources={[
             { id: 'https://highrisechimney.com', name: 'High Rise Chimney (URL Prefix)', type: 'URL_PREFIX', context: 'URL Prefix' },
-            { id: 'sc-domain:highrisechimney.com', name: 'highrisechimney.com (Domain Property)', type: 'DOMAIN_PROPERTY', context: 'Domain Property'
+            { id: 'sc-domain:highrisechimney.com', name: 'highrisechimney.com (Domain Property)', type: 'DOMAIN_PROPERTY', context: 'Domain Property' },
+          ]}
+          onSelectResource={(id) => handleSelectResource('gsc', id)}
+          onSyncNow={() => handleSyncNow('gsc')}
+        />
+
+        <ProviderCard
+          title="Bing Webmaster Tools"
+          providerKey="bing_webmaster"
+          mappedValue={activeClient?.mappings?.bing_webmaster_site_url}
+          lastSync="Oct 11 15:48 EDT"
+          isCertified={Boolean(activeClient?.is_certified && activeClient?.mappings?.bing_webmaster_site_url)}
+          discoveredResources={[
+            { id: 'https://highrisechimney.com', name: 'High Rise Chimney Sweep (Verified Site)', type: 'VERIFIED_SITE' },
+          ]}
+          onSelectResource={(id) => handleSelectResource('bing_webmaster', id)}
+          onSyncNow={() => handleSyncNow('bing_webmaster')}
+        />
+      </div>
+    </main>
+  );
+}
+
+export default function ConnectionCenterPage() {
+  return (
+    <div className="min-h-screen bg-[#0B0F17] text-
