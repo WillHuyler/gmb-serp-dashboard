@@ -59,7 +59,7 @@ function ProviderCard({
     }
     return isCertified
       ? { label: 'HEALTHY', color: 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30' }
-      : { label: 'MAPPED', color: 'bg-blue-500/20 text-blue-400 border-blue-500/20' };
+      : { label: 'MAPPED', color: 'bg-blue-500/20 text-blue-400 border-blue-500/30' };
   };
 
   const status = getStatus();
@@ -288,4 +288,13 @@ function ConnectionCenterContent() {
 
 export default function ConnectionCenterPage() {
   return (
-    <div className="min-h-screen bg-[#0B0F17] text-
+    <div className="min-h-screen bg-[#0B0F17] text-white flex flex-col font-sans">
+      <Suspense fallback={<div className="p-6 text-xs text-slate-400 font-mono">Loading Header...</div>}>
+        <GlobalHeader />
+      </Suspense>
+      <Suspense fallback={<div className="p-6 text-xs text-slate-400 font-mono">Loading Connection Center...</div>}>
+        <ConnectionCenterContent />
+      </Suspense>
+    </div>
+  );
+}
