@@ -26,7 +26,7 @@ export interface ClientMappings {
   [key: string]: string | undefined;
 }
 
-export interface Client {
+export interface ClientProfile {
   id: string;
   tenant_id: string;
   name: string;
@@ -35,7 +35,9 @@ export interface Client {
   mappings?: ClientMappings;
 }
 
-export const CANONICAL_CLIENTS: Client[] = [
+export type Client = ClientProfile;
+
+export const AUTHORITATIVE_CLIENT_REGISTRY: ClientProfile[] = [
   {
     id: 'a1b2c3d4-e5f6-7890-abcd-ef1234567890',
     tenant_id: '00000000-0000-0000-0000-000000000001',
@@ -92,12 +94,14 @@ export const CANONICAL_CLIENTS: Client[] = [
   },
 ];
 
+export const CANONICAL_CLIENTS = AUTHORITATIVE_CLIENT_REGISTRY;
+
 interface ClientContextType {
-  activeClient: Client | null;
-  availableClients: Client[];
-  clients: Client[];
-  clientRegistry: Client[]; // Added alias to fulfill useClient() destructuring in app/command-center/page.tsx
-  setActiveClient: (client: Client) => void;
+  activeClient: ClientProfile | null;
+  availableClients: ClientProfile[];
+  clients: ClientProfile[];
+  clientRegistry: ClientProfile[];
+  setActiveClient: (client: ClientProfile) => void;
   setActiveClientId: (id: string) => void;
   isLoading: boolean;
 }
@@ -105,20 +109,20 @@ interface ClientContextType {
 const ClientContext = createContext<ClientContextType | undefined>(undefined);
 
 export function ClientProvider({ children }: { children: ReactNode }) {
-  const [activeClient, setActiveClientState] = useState<Client | null>(CANONICAL_CLIENTS[0]);
+  const [activeClient, setActiveClientState] = useState<ClientProfile | null>(AUTHORITATIVE_CLIENT_REGISTRY[0]);
   const [isLoading, setIsLoading] = useState<boolean>(false);
 
   useEffect(() => {
     const savedClientId = typeof window !== 'undefined' ? localStorage.getItem('porchlight_active_client_id') : null;
     if (savedClientId) {
-      const match = CANONICAL_CLIENTS.find((c) => c.id === savedClientId);
+      const match = AUTHORITATIVE_CLIENT_REGISTRY.find((c) => c.id === savedClientId);
       if (match) {
         setActiveClientState(match);
       }
     }
   }, []);
 
-  const setActiveClient = (client: Client) => {
+  const setActiveClient = (client: ClientProfile) => {
     setIsLoading(true);
     setActiveClientState(client);
     if (typeof window !== 'undefined') {
@@ -128,7 +132,7 @@ export function ClientProvider({ children }: { children: ReactNode }) {
   };
 
   const setActiveClientId = (id: string) => {
-    const match = CANONICAL_CLIENTS.find((c) => c.id === id);
+    const match = AUTHORITATIVE_CLIENT_REGISTRY.find((c) => c.id === id);
     if (match) {
       setActiveClient(match);
     }
@@ -138,9 +142,9 @@ export function ClientProvider({ children }: { children: ReactNode }) {
     <ClientContext.Provider
       value={{
         activeClient,
-        availableClients: CANONICAL_CLIENTS,
-        clients: CANONICAL_CLIENTS,
-        clientRegistry: CANONICAL_CLIENTS,
+        availableClients: AUTHORITATIVE_CLIENT_REGISTRY,
+        clients: AUTHORITATIVE_CLIENT_REGISTRY,
+        clientRegistry: AUTHORITATIVE_CLIENT_REGISTRY,
         setActiveClient,
         setActiveClientId,
         isLoading,
