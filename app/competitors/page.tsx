@@ -1,145 +1,46 @@
 'use client';
 
-import React, { Suspense } from 'react';
+import React from 'react';
 import { useClient } from '../../lib/client-context';
-import GlobalHeader from '../../components/navigation/GlobalHeader';
 
-export const dynamic = 'force-dynamic';
-
-function CompetitorsContent() {
+export default function CompetitorsPage() {
   const { activeClient } = useClient();
 
-  const brightlocalId = activeClient?.mappings?.brightlocal_location_id;
-  const isCertifiedAndMapped = Boolean(brightlocalId && activeClient?.is_certified);
-
-  if (!activeClient) {
-    return (
-      <main className="flex-1 p-6 max-w-7xl w-full mx-auto space-y-6">
-        <div className="p-8 rounded-xl bg-[#111622] border border-[#A9C7E5]/10 text-center text-slate-400 text-xs font-mono">
-          NO CLIENT SELECTED — SELECT AN ACTIVE CLIENT TO VIEW COMPETITOR ANALYSIS
-        </div>
-      </main>
-    );
-  }
-
   return (
-    <main className="flex-1 p-6 max-w-7xl w-full mx-auto space-y-6">
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+    <div className="space-y-6 text-[#0B1F3A]">
+      <div className="flex justify-between items-start">
         <div>
-          <span className="text-[10px] font-mono uppercase tracking-widest text-[#D99614] font-bold block">
-            LOCAL MARKET TELEMETRY • OTTERWATCH INTELLIGENCE
+          <span className="text-[10px] font-mono uppercase tracking-widest text-slate-400 font-bold block">
+            LOCAL COMPETITIVE OVERLAP
           </span>
-          <h1 className="text-2xl font-bold tracking-tight text-white mt-1">Competitor Map Pack Analysis</h1>
-          <p className="text-xs text-slate-400 mt-0.5">
-            SERP visibility and local rank comparison for <strong className="text-white">{activeClient.name}</strong>.
+          <h1 className="text-2xl font-bold tracking-tight text-[#0B1F3A] mt-0.5">
+            {activeClient?.name || 'Active Client'}
+          </h1>
+          <p className="text-xs text-[#53657D] mt-1">
+            Local SERP node rankings, Share of Voice comparison, and keyword competitive overlap[cite: 1, 2, 5].
           </p>
-        </div>
-
-        <div className="flex items-center space-x-3">
-          <span
-            className={`text-xs font-mono px-3 py-1 rounded border font-bold ${
-              isCertifiedAndMapped
-                ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'
-                : 'bg-amber-500/10 text-amber-400 border-amber-500/20'
-            }`}
-          >
-            {isCertifiedAndMapped ? '✓ OTTERWATCH DATA ACTIVE' : '⚠ NO COMPETITOR TELEMETRY'}
-          </span>
         </div>
       </div>
 
-      {!isCertifiedAndMapped ? (
-        <div className="p-8 rounded-xl bg-[#111622] border border-[#A9C7E5]/10 text-center space-y-3">
-          <span className="text-amber-400 text-xs font-mono tracking-widest uppercase block font-bold">
-            Data Requirement Gate
-          </span>
-          <h2 className="text-xl font-bold text-white">NO VERIFIED COMPETITOR TELEMETRY</h2>
-          <p className="text-slate-400 text-xs max-w-md mx-auto">
-            <strong className="text-white">{activeClient.name}</strong> does not have an active BrightLocal location mapping or certified 5x5 geo-grid history. Connect BrightLocal Location ID in Connection Center.
+      <div className="bg-white border border-[#DCE5EF] rounded-xl p-12 text-center space-y-4 shadow-sm max-w-2xl mx-auto mt-12">
+        <div className="w-12 h-12 bg-[#F4F7FB] border border-[#DCE5EF] rounded-full flex items-center justify-center mx-auto text-xl">
+          ⚔️
+        </div>
+        <div>
+          <h3 className="text-sm font-bold font-mono text-[#0B1F3A] uppercase tracking-wider">
+            COMPETITOR OVERLAP SOURCED FROM OTTERWATCH
+          </h3>
+          <p className="text-xs text-[#53657D] mt-1 max-w-md mx-auto">
+            Competitive matrix telemetry is generated directly from active 5x5 geo-grid scans for <strong className="text-[#0B1F3A]">{activeClient?.name || 'this client'}</strong>[cite: 1, 2, 5].
           </p>
         </div>
-      ) : (
-        <div className="space-y-6">
-          <div className="bg-[#111622] border border-[#A9C7E5]/10 rounded-xl p-4 grid grid-cols-2 md:grid-cols-4 gap-4 text-xs font-mono">
-            <div>
-              <span className="text-slate-500 block uppercase text-[10px]">ACTIVE CLIENT</span>
-              <span className="text-white font-bold">{activeClient.name}</span>
-            </div>
-            <div>
-              <span className="text-slate-500 block uppercase text-[10px]">LOCATION MAPPING</span>
-              <span className="text-white font-bold">{brightlocalId}</span>
-            </div>
-            <div>
-              <span className="text-slate-500 block uppercase text-[10px]">SERP OBSERVATION</span>
-              <span className="text-emerald-400 font-bold">5x5 Grid Telemetry</span>
-            </div>
-            <div>
-              <span className="text-slate-500 block uppercase text-[10px]">LAST SCAN</span>
-              <span className="text-emerald-400 font-bold">2026-10-06 18:30 UTC</span>
-            </div>
-          </div>
-
-          <div className="bg-[#111622] border border-[#A9C7E5]/10 rounded-xl overflow-hidden">
-            <div className="p-4 border-b border-[#A9C7E5]/10">
-              <h3 className="text-sm font-bold text-white uppercase tracking-wider font-mono">
-                LOCAL MAP PACK COMPETITOR OVERLAP
-              </h3>
-            </div>
-            <div className="overflow-x-auto">
-              <table className="w-full text-left text-xs font-mono">
-                <thead className="bg-[#151D2A] text-slate-400 uppercase text-[10px]">
-                  <tr>
-                    <th className="p-3">Entity Name</th>
-                    <th className="p-3">Avg Map Rank</th>
-                    <th className="p-3">Share of Voice</th>
-                    <th className="p-3">Top-3 Grid Nodes</th>
-                    <th className="p-3">Status</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-[#A9C7E5]/10 text-slate-300">
-                  <tr className="bg-emerald-500/5">
-                    <td className="p-3 font-bold text-white flex items-center space-x-2">
-                      <span className="text-emerald-400 font-bold">★</span>
-                      <span>{activeClient.name} (Active Client)</span>
-                    </td>
-                    <td className="p-3 text-[#D99614] font-bold">#3.4</td>
-                    <td className="p-3">38.2%</td>
-                    <td className="p-3">12 / 25</td>
-                    <td className="p-3 text-emerald-400 font-bold">TARGET</td>
-                  </tr>
-                  <tr>
-                    <td className="p-3 font-bold text-slate-400">Competitor Identity Unavailable</td>
-                    <td className="p-3 text-slate-400">#2.1</td>
-                    <td className="p-3">41.0%</td>
-                    <td className="p-3">15 / 25</td>
-                    <td className="p-3 text-slate-500">BENCHMARK</td>
-                  </tr>
-                  <tr>
-                    <td className="p-3 font-bold text-slate-400">Competitor Identity Unavailable</td>
-                    <td className="p-3 text-slate-400">#6.2</td>
-                    <td className="p-3">20.8%</td>
-                    <td className="p-3">5 / 25</td>
-                    <td className="p-3 text-slate-500">BENCHMARK</td>
-                  </tr>
-                </tbody>
-              </table>
-            </div>
-          </div>
-        </div>
-      )}
-    </main>
-  );
-}
-
-export default function CompetitorsPage() {
-  return (
-    <div className="min-h-screen bg-[#0B0F17] text-white flex flex-col font-sans">
-      <Suspense fallback={<div className="p-6 text-xs text-slate-400 font-mono">Loading Header...</div>}>
-        <GlobalHeader />
-      </Suspense>
-      <Suspense fallback={<div className="p-6 text-xs text-slate-400 font-mono">Loading Competitor Telemetry...</div>}>
-        <CompetitorsContent />
-      </Suspense>
+        <a
+          href="/otterwatch"
+          className="inline-block bg-[#0B1F3A] hover:bg-[#142E52] text-white font-mono font-bold text-xs px-5 py-2.5 rounded-lg shadow-sm transition-all"
+        >
+          View Local Search Geo-Grid →
+        </a>
+      </div>
     </div>
   );
 }
