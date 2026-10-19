@@ -2,7 +2,6 @@
 
 import React, { useState, Suspense } from 'react';
 import { useClient } from '../../lib/client-context';
-import GlobalHeader from '../../components/navigation/GlobalHeader';
 
 export const dynamic = 'force-dynamic';
 
@@ -29,7 +28,6 @@ export interface DiscoveredResource {
 
 interface ProviderCardProps {
   title: string;
-  providerKey: 'google_ads' | 'ga4' | 'gsc' | 'bing_webmaster';
   mappedValue?: string;
   lastSync?: string;
   isCertified: boolean;
@@ -229,7 +227,6 @@ function ConnectionCenterContent() {
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         <ProviderCard
           title="Google Ads"
-          providerKey="google_ads"
           mappedValue={activeClient?.mappings?.google_ads_id}
           lastSync="Oct 11 15:48 EDT"
           isCertified={Boolean(activeClient?.is_certified && activeClient?.mappings?.google_ads_id)}
@@ -243,7 +240,6 @@ function ConnectionCenterContent() {
 
         <ProviderCard
           title="Google Analytics 4 (GA4)"
-          providerKey="ga4"
           mappedValue={activeClient?.mappings?.ga4_property_id}
           lastSync="Oct 11 15:48 EDT"
           isCertified={Boolean(activeClient?.is_certified && activeClient?.mappings?.ga4_property_id)}
@@ -257,7 +253,6 @@ function ConnectionCenterContent() {
 
         <ProviderCard
           title="Google Search Console (GSC)"
-          providerKey="gsc"
           mappedValue={activeClient?.mappings?.gsc_site_url}
           lastSync="Oct 11 15:48 EDT"
           isCertified={Boolean(activeClient?.is_certified && activeClient?.mappings?.gsc_site_url)}
@@ -271,7 +266,6 @@ function ConnectionCenterContent() {
 
         <ProviderCard
           title="Bing Webmaster Tools"
-          providerKey="bing_webmaster"
           mappedValue={activeClient?.mappings?.bing_webmaster_site_url}
           lastSync="Oct 11 15:48 EDT"
           isCertified={Boolean(activeClient?.is_certified && activeClient?.mappings?.bing_webmaster_site_url)}
@@ -289,9 +283,6 @@ function ConnectionCenterContent() {
 export default function ConnectionCenterPage() {
   return (
     <div className="min-h-screen bg-[#0B0F17] text-white flex flex-col font-sans">
-      <Suspense fallback={<div className="p-6 text-xs text-slate-400 font-mono">Loading Header...</div>}>
-        <GlobalHeader />
-      </Suspense>
       <Suspense fallback={<div className="p-6 text-xs text-slate-400 font-mono">Loading Connection Center...</div>}>
         <ConnectionCenterContent />
       </Suspense>
