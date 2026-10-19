@@ -1,7 +1,10 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React, { useState, Suspense } from 'react';
 import { useClient } from '../../lib/client-context';
+import GlobalHeader from '../../components/navigation/GlobalHeader';
+
+export const dynamic = 'force-dynamic';
 
 export type MappingStatus =
   | 'NOT_CONNECTED'
@@ -17,7 +20,7 @@ export type MappingStatus =
   | 'REAUTH_REQUIRED'
   | 'CONFIGURATION_REQUIRED';
 
-interface DiscoveredResource {
+export interface DiscoveredResource {
   id: string;
   name: string;
   type: string;
@@ -37,7 +40,6 @@ interface ProviderCardProps {
 
 function ProviderCard({
   title,
-  providerKey,
   mappedValue,
   lastSync,
   isCertified,
@@ -98,7 +100,7 @@ function ProviderCard({
             <option value="">-- Select Discovered Resource --</option>
             {discoveredResources.map((res) => (
               <option key={res.id} value={res.id}>
-                {res.name} ({res.id}) {res.context ? `[${res.context}]` : ''}
+                {res.name} ({res.id}) [{res.type}] {res.context ? `[${res.context}]` : ''}
               </option>
             ))}
           </select>
@@ -160,7 +162,7 @@ function ProviderCard({
   );
 }
 
-export default function ConnectionCenterPage() {
+function ConnectionCenterContent() {
   const { activeClient } = useClient();
   const [syncStatus, setSyncStatus] = useState<string | null>(null);
 
@@ -202,10 +204,10 @@ export default function ConnectionCenterPage() {
   };
 
   return (
-    <div className="p-8 space-y-8 bg-[#0B0F17] text-white min-h-screen">
+    <main className="flex-1 p-8 space-y-8 max-w-7xl w-full mx-auto">
       <div className="flex justify-between items-center border-b border-[#A9C7E5]/10 pb-6">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight font-mono">CONNECTION CENTER</h1>
+          <h1 className="text-2xl font-bold tracking-tight font-mono text-white">CONNECTION CENTER</h1>
           <p className="text-sm text-slate-400 mt-1">
             Explicit Client Provider Mapping Workspace & Certification Control Plane
           </p>
@@ -232,8 +234,8 @@ export default function ConnectionCenterPage() {
           lastSync="Oct 11 15:48 EDT"
           isCertified={Boolean(activeClient?.is_certified && activeClient?.mappings?.google_ads_id)}
           discoveredResources={[
-            { id: 'ads_highrise_9821', name: 'High Rise Chimney Sweep - Search Account' },
-            { id: 'ads_kellyhyundai_4412', name: 'Kelly Hyundai - Regional PPC' },
+            { id: 'ads_highrise_9821', name: 'High Rise Chimney Sweep - Search Account', type: 'GOOGLE_ADS_CUSTOMER' },
+            { id: 'ads_kellyhyundai_4412', name: 'Kelly Hyundai - Regional PPC', type: 'GOOGLE_ADS_CUSTOMER' },
           ]}
           onSelectResource={(id) => handleSelectResource('google_ads', id)}
           onSyncNow={() => handleSyncNow('google_ads')}
@@ -246,8 +248,8 @@ export default function ConnectionCenterPage() {
           lastSync="Oct 11 15:48 EDT"
           isCertified={Boolean(activeClient?.is_certified && activeClient?.mappings?.ga4_property_id)}
           discoveredResources={[
-            { id: 'ga4_highrise_3311', name: 'High Rise Web Stream', context: 'highrisechimney.com' },
-            { id: 'ga4_apexdental_1029', name: 'Apex Primary Stream', context: 'apexdental.com' },
+            { id: 'ga4_highrise_3311', name: 'High Rise Web Stream', type: 'GA4_PROPERTY', context: 'highrisechimney.com' },
+            { id: 'ga4_apexdental_1029', name: 'Apex Primary Stream', type: 'GA4_PROPERTY', context: 'apexdental.com' },
           ]}
           onSelectResource={(id) => handleSelectResource('ga4', id)}
           onSyncNow={() => handleSyncNow('ga4')}
@@ -260,26 +262,5 @@ export default function ConnectionCenterPage() {
           lastSync="Oct 11 15:48 EDT"
           isCertified={Boolean(activeClient?.is_certified && activeClient?.mappings?.gsc_site_url)}
           discoveredResources={[
-            { id: 'https://highrisechimney.com', name: 'High Rise Chimney (URL Prefix)', context: 'URL Prefix' },
-            { id: 'sc-domain:highrisechimney.com', name: 'highrisechimney.com (Domain Property)', context: 'Domain Property' },
-          ]}
-          onSelectResource={(id) => handleSelectResource('gsc', id)}
-          onSyncNow={() => handleSyncNow('gsc')}
-        />
-
-        <ProviderCard
-          title="Bing Webmaster Tools"
-          providerKey="bing_webmaster"
-          mappedValue={activeClient?.mappings?.bing_webmaster_site_url}
-          lastSync="Oct 11 15:48 EDT"
-          isCertified={Boolean(activeClient?.is_certified && activeClient?.mappings?.bing_webmaster_site_url)}
-          discoveredResources={[
-            { id: 'https://highrisechimney.com', name: 'High Rise Chimney Sweep (Verified Site)' },
-          ]}
-          onSelectResource={(id) => handleSelectResource('bing_webmaster', id)}
-          onSyncNow={() => handleSyncNow('bing_webmaster')}
-        />
-      </div>
-    </div>
-  );
-}
+            { id: 'https://highrisechimney.com', name: 'High Rise Chimney (URL Prefix)', type: 'URL_PREFIX', context: 'URL Prefix' },
+            { id: 'sc-domain:highrisechimney.com', name: 'highrisechimney.com (Domain Property)', type: 'DOMAIN_PROPERTY', context: 'Domain Property'
