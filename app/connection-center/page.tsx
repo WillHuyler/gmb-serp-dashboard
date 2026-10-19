@@ -278,3 +278,23 @@ function ConnectionCenterContent() {
           discoveredResources={[
             { id: 'https://highrisechimney.com', name: 'High Rise Chimney Sweep (Verified Site)', type: 'VERIFIED_SITE' },
           ]}
+          onSelectResource={(id) => handleSelectResource('bing_webmaster', id)}
+          onSyncNow={() => handleSyncNow('bing_webmaster')}
+        />
+      </div>
+    </main>
+  );
+}
+
+export default function ConnectionCenterPage() {
+  return (
+    <div className="min-h-screen bg-[#0B0F17] text-white flex flex-col font-sans">
+      <Suspense fallback={<div className="p-6 text-xs text-slate-400 font-mono">Loading Header...</div>}>
+        <GlobalHeader />
+      </Suspense>
+      <Suspense fallback={<div className="p-6 text-xs text-slate-400 font-mono">Loading Connection Center...</div>}>
+        <ConnectionCenterContent />
+      </Suspense>
+    </div>
+  );
+}
