@@ -71,7 +71,7 @@ export function ClientProvider({ children }: { children: ReactNode }) {
             setActiveClientState(data.clients[0]);
           }
         } else {
-          // Fallback direct query via Supabase JS client
+          // Direct fallback query via Supabase JS client
           const { data: dbClients, error: dbError } = await supabase
             .from('clients')
             .select('*')
