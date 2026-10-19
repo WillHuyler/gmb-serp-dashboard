@@ -1,126 +1,130 @@
 'use client';
 
-import React, { createContext, useContext, useState } from 'react';
+import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 
-export interface ClientProfile {
-  id: string;
-  tenant_id?: string;
-  name: string;
-  address?: string;
-  is_certified: boolean;
-  service_areas: string[];
-  mappings: {
-    google_ads_id?: string;
-    meta_act_id?: string;
-    ga4_property_id?: string;
-    gsc_site_url?: string;
-    gmb_account_id?: string;
-    gmb_location_id?: string;
-    brightlocal_location_id?: string;
-    serpapi_location_key?: string;
-    bing_webmaster_site_url?: string;
-    clarity_project_id?: string;
-  };
+export type ProviderMappingKey =
+  | 'gmb_account_id'
+  | 'gmb_location_id'
+  | 'google_ads_id'
+  | 'ga4_property_id'
+  | 'gsc_site_url'
+  | 'meta_act_id'
+  | 'bing_webmaster_site_url'
+  | 'clarity_project_id'
+  | 'brightlocal_location_id';
+
+export interface ClientMappings {
+  gmb_account_id?: string;
+  gmb_location_id?: string;
+  google_ads_id?: string;
+  ga4_property_id?: string;
+  gsc_site_url?: string;
+  meta_act_id?: string;
+  bing_webmaster_site_url?: string;
+  clarity_project_id?: string;
+  brightlocal_location_id?: string;
+  [key: string]: string | undefined;
 }
 
-export type Client = ClientProfile;
+export interface Client {
+  id: string;
+  tenant_id: string;
+  name: string;
+  is_certified: boolean;
+  mappings?: ClientMappings;
+}
 
-export const AUTHORITATIVE_CLIENT_REGISTRY: ClientProfile[] = [
+export const CANONICAL_CLIENTS: Client[] = [
   {
-    id: 'bf93fef0-fc60-4119-8ea2-68a274984355',
-    tenant_id: 'tenant_porchlight_primary_01',
-    name: 'High Rise Chimney Sweep & Service',
-    address: 'Milwaukee, WI',
-    is_certified: true,
-    service_areas: ['53202', '53203', '53211', '53217'],
+    id: 'a1b2c3d4-e5f6-7890-abcd-ef1234567890',
+    tenant_id: '00000000-0000-0000-0000-000000000001',
+    name: 'ABC Motors',
+    is_certified: false,
     mappings: {
-      google_ads_id: '123-456-7890',
-      meta_act_id: 'act_987654321',
-      ga4_property_id: '304958612',
-      gsc_site_url: 'https://highrisechimney.com',
-      gmb_account_id: 'accounts/109283748291',
-      gmb_location_id: 'locations/847291048291',
-      brightlocal_location_id: 'bl_loc_highrise_53202',
-      bing_webmaster_site_url: 'https://highrisechimney.com',
-      clarity_project_id: 'clr_highrise_99',
+      gmb_account_id: 'gmb_abc_motors_01',
+      brightlocal_location_id: 'bl_abc_motors_01',
     },
   },
   {
-    id: 'd3e4f5a6-b7c8-9012-cdef-345678901234',
-    tenant_id: 'tenant_porchlight_primary_01',
-    name: 'Kelly Hyundai of Stroudsburg',
-    address: '1534 N 9th St, Stroudsburg, PA 18360',
+    id: 'bf93fef0-fc60-4119-8ea2-68a274984355',
+    tenant_id: '00000000-0000-0000-0000-000000000001',
+    name: 'High Rise Chimney Sweep & Service',
     is_certified: true,
-    service_areas: ['18360', '18301', '18302'],
     mappings: {
-      google_ads_id: '345-678-9012',
-      meta_act_id: 'act_765432109',
-      ga4_property_id: '506978834',
-      gsc_site_url: 'https://kellyhyundai.com',
-      gmb_account_id: 'accounts/109283748291',
-      gmb_location_id: 'locations/992817401928',
-      brightlocal_location_id: 'bl_loc_kelly_18360',
-      bing_webmaster_site_url: 'https://kellyhyundai.com',
-      clarity_project_id: 'clr_kelly_101',
+      gmb_account_id: 'gmb_highrise_01',
+      gmb_location_id: 'loc_highrise_53202',
+      google_ads_id: 'ads_highrise_9821',
+      ga4_property_id: 'ga4_highrise_3311',
+      gsc_site_url: 'https://highrisechimney.com',
+      meta_act_id: 'act_highrise_2209',
+      bing_webmaster_site_url: 'https://highrisechimney.com',
+      clarity_project_id: 'ms_clarity_hr_881',
+      brightlocal_location_id: 'bl_highrise_53202',
     },
   },
   {
     id: 'c2d3e4f5-a6b7-8901-bcde-f23456789012',
-    tenant_id: 'tenant_porchlight_primary_01',
+    tenant_id: '00000000-0000-0000-0000-000000000001',
     name: 'Apex Dental Group',
-    address: 'Beverly Hills, CA',
     is_certified: true,
-    service_areas: ['90210', '90211', '90212'],
     mappings: {
-      google_ads_id: '234-567-8901',
-      meta_act_id: 'act_876543210',
-      ga4_property_id: '405968723',
-      gsc_site_url: 'https://apexdentalgroup.com',
-      gmb_account_id: 'accounts/109283748291',
-      gmb_location_id: 'locations/112233445566',
-      brightlocal_location_id: 'bl_loc_apex_90210',
-      bing_webmaster_site_url: 'https://apexdentalgroup.com',
-      clarity_project_id: 'clr_apex_102',
+      gmb_account_id: 'gmb_apexdental_01',
+      ga4_property_id: 'ga4_apexdental_1029',
+      clarity_project_id: 'ms_clarity_apex_441',
     },
   },
   {
-    id: 'a1b2c3d4-e5f6-7890-abcd-ef1234567890',
-    tenant_id: 'tenant_porchlight_primary_01',
-    name: 'ABC Motors',
-    address: 'Atlanta, GA',
-    is_certified: false,
-    service_areas: ['30301', '30302'],
-    mappings: {},
+    id: 'd3e4f5a6-b7c8-9012-cdef-345678901234',
+    tenant_id: '00000000-0000-0000-0000-000000000001',
+    name: 'Kelly Hyundai of Stroudsburg',
+    is_certified: true,
+    mappings: {
+      gmb_account_id: 'gmb_kellyhyundai_01',
+      google_ads_id: 'ads_kellyhyundai_4412',
+      ga4_property_id: 'ga4_kellyhyundai_9012',
+      bing_webmaster_site_url: 'https://kellyhyundai.com',
+    },
   },
 ];
 
-export const CANONICAL_CLIENTS = AUTHORITATIVE_CLIENT_REGISTRY;
-
 interface ClientContextType {
-  activeClient: ClientProfile | null;
-  setActiveClient: (client: ClientProfile) => void;
+  activeClient: Client | null;
+  availableClients: Client[];
+  clients: Client[];
+  setActiveClient: (client: Client) => void;
   setActiveClientId: (id: string) => void;
-  clientRegistry: ClientProfile[];
-  clients: ClientProfile[];
-  availableClients: ClientProfile[];
+  isLoading: boolean;
 }
 
-const ClientContext = createContext<ClientContextType>({
-  activeClient: AUTHORITATIVE_CLIENT_REGISTRY[0],
-  setActiveClient: () => {},
-  setActiveClientId: () => {},
-  clientRegistry: AUTHORITATIVE_CLIENT_REGISTRY,
-  clients: AUTHORITATIVE_CLIENT_REGISTRY,
-  availableClients: AUTHORITATIVE_CLIENT_REGISTRY,
-});
+const ClientContext = createContext<ClientContextType | undefined>(undefined);
 
-export function ClientProvider({ children }: { children: React.ReactNode }) {
-  const [activeClient, setActiveClient] = useState<ClientProfile>(AUTHORITATIVE_CLIENT_REGISTRY[0]);
+export function ClientProvider({ children }: { children: ReactNode }) {
+  const [activeClient, setActiveClientState] = useState<Client | null>(CANONICAL_CLIENTS[0]);
+  const [isLoading, setIsLoading] = useState<boolean>(false);
+
+  useEffect(() => {
+    const savedClientId = typeof window !== 'undefined' ? localStorage.getItem('porchlight_active_client_id') : null;
+    if (savedClientId) {
+      const match = CANONICAL_CLIENTS.find((c) => c.id === savedClientId);
+      if (match) {
+        setActiveClientState(match);
+      }
+    }
+  }, []);
+
+  const setActiveClient = (client: Client) => {
+    setIsLoading(true);
+    setActiveClientState(client);
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('porchlight_active_client_id', client.id);
+    }
+    setTimeout(() => setIsLoading(false), 150);
+  };
 
   const setActiveClientId = (id: string) => {
-    const found = AUTHORITATIVE_CLIENT_REGISTRY.find((c) => c.id === id);
-    if (found) {
-      setActiveClient(found);
+    const match = CANONICAL_CLIENTS.find((c) => c.id === id);
+    if (match) {
+      setActiveClient(match);
     }
   };
 
@@ -128,11 +132,11 @@ export function ClientProvider({ children }: { children: React.ReactNode }) {
     <ClientContext.Provider
       value={{
         activeClient,
+        availableClients: CANONICAL_CLIENTS,
+        clients: CANONICAL_CLIENTS,
         setActiveClient,
         setActiveClientId,
-        clientRegistry: AUTHORITATIVE_CLIENT_REGISTRY,
-        clients: AUTHORITATIVE_CLIENT_REGISTRY,
-        availableClients: AUTHORITATIVE_CLIENT_REGISTRY,
+        isLoading,
       }}
     >
       {children}
@@ -141,5 +145,9 @@ export function ClientProvider({ children }: { children: React.ReactNode }) {
 }
 
 export function useClient() {
-  return useContext(ClientContext);
+  const context = useContext(ClientContext);
+  if (!context) {
+    throw new Error('useClient must be used within a ClientProvider');
+  }
+  return context;
 }
