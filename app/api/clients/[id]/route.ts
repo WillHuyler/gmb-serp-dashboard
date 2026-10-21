@@ -1,39 +1,21 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { validateClientAccess } from '../../../../lib/auth-guard';
-import {
-  createServiceRoleSupabaseClient,
-  createUserScopedSupabaseClient,
-  extractAccessToken,
-} from '../../../../lib/supabase/auth-server';
+import { validateClientAccess, getServerSupabaseClient } from '../../../../lib/auth-guard';
 import { normalizeClientRow } from '../route';
 
 export const dynamic = 'force-dynamic';
 
-function getDbClient(req: NextRequest) {
-  try {
-    return createServiceRoleSupabaseClient();
-  } catch {
-    const token = extractAccessToken(req)!;
-    return createUserScopedSupabaseClient(token);
-  }
-}
-
-/**
- * GET /api/clients/:id
- * Retrieves a single authorized client record and its current mappings.
- */
 export async function GET(
   req: NextRequest,
   { params }: { params: { id: string } }
 ) {
   const clientId = params.id;
-  const authCheck = await validateClientAccess(req, clientId);
+  const authCheck = await validateClientAccess(req, clientId, true);
   if (!authCheck.authorized || !authCheck.context) {
     return authCheck.errorResponse!;
   }
 
   try {
-    const supabase = getDbClient(req);
+    const supabase = getServerSupabaseClient(req);
     const [clientRes, mapRes] = await Promise.all([
       supabase
         .from('clients')
@@ -66,17 +48,12 @@ export async function GET(
   }
 }
 
-/**
- * PATCH /api/clients/:id
- * Updates client details (name, address, service_areas).
- * Never allows direct tampering with tenant_id or synthetic certification bypass.
- */
 export async function PATCH(
   req: NextRequest,
   { params }: { params: { id: string } }
 ) {
   const clientId = params.id;
-  const authCheck = await validateClientAccess(req, clientId);
+  const authCheck = await validateClientAccess(req, clientId, true);
   if (!authCheck.authorized || !authCheck.context) {
     return authCheck.errorResponse!;
   }
@@ -112,7 +89,7 @@ export async function PATCH(
       );
     }
 
-    const supabase = getDbClient(req);
+    const supabase = getServerSupabaseClient(req);
     const { data: updated, error: updateErr } = await supabase
       .from('clients')
       .update(updatePayload)
