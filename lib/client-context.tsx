@@ -1,162 +1,167 @@
 'use client';
 
-import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 
 export type ProviderMappingKey =
-  | 'gmb_account_id'
-  | 'gmb_location_id'
   | 'google_ads_id'
+  | 'meta_act_id'
   | 'ga4_property_id'
   | 'gsc_site_url'
-  | 'meta_act_id'
+  | 'gmb_account_id'
+  | 'gmb_location_id'
+  | 'brightlocal_location_id'
+  | 'serpapi_location_key'
   | 'bing_webmaster_site_url'
-  | 'clarity_project_id'
-  | 'brightlocal_location_id';
+  | 'clarity_project_id';
 
-export interface ClientMappings {
-  gmb_account_id?: string;
-  gmb_location_id?: string;
+export interface ClientProfileMappings {
   google_ads_id?: string;
+  meta_act_id?: string;
   ga4_property_id?: string;
   gsc_site_url?: string;
-  meta_act_id?: string;
+  gmb_account_id?: string;
+  gmb_location_id?: string;
+  brightlocal_location_id?: string;
+  serpapi_location_key?: string;
   bing_webmaster_site_url?: string;
   clarity_project_id?: string;
-  brightlocal_location_id?: string;
-  [key: string]: string | undefined;
 }
 
 export interface ClientProfile {
   id: string;
-  tenant_id?: string;
+  tenant_id: string;
   name: string;
+  address?: string;
+  status?: 'active' | 'inactive' | 'onboarding' | 'legacy_unverified';
   is_certified: boolean;
-  service_areas?: string[];
-  mappings?: ClientMappings;
+  service_areas: string[];
+  mappings: ClientProfileMappings;
+  mapped_resource_count?: number;
+  last_sync_at?: string | null;
+  created_at?: string;
 }
 
 export type Client = ClientProfile;
 
-export const AUTHORITATIVE_CLIENT_REGISTRY: ClientProfile[] = [
-  {
-    id: 'a1b2c3d4-e5f6-7890-abcd-ef1234567890',
-    tenant_id: '00000000-0000-0000-0000-000000000001',
-    name: 'ABC Motors',
-    is_certified: false,
-    service_areas: ['53202', '53203', '53211'],
-    mappings: {
-      gmb_account_id: 'gmb_abc_motors_01',
-      brightlocal_location_id: 'bl_abc_motors_01',
-    },
-  },
-  {
-    id: 'bf93fef0-fc60-4119-8ea2-68a274984355',
-    tenant_id: '00000000-0000-0000-0000-000000000001',
-    name: 'High Rise Chimney Sweep & Service',
-    is_certified: true,
-    service_areas: ['53202', '53203', '53211', '53217'],
-    mappings: {
-      gmb_account_id: 'gmb_highrise_01',
-      gmb_location_id: 'loc_highrise_53202',
-      google_ads_id: 'ads_highrise_9821',
-      ga4_property_id: 'ga4_highrise_3311',
-      gsc_site_url: 'https://highrisechimney.com',
-      meta_act_id: 'act_highrise_2209',
-      bing_webmaster_site_url: 'https://highrisechimney.com',
-      clarity_project_id: 'ms_clarity_hr_881',
-      brightlocal_location_id: 'bl_highrise_53202',
-    },
-  },
-  {
-    id: 'c2d3e4f5-a6b7-8901-bcde-f23456789012',
-    tenant_id: '00000000-0000-0000-0000-000000000001',
-    name: 'Apex Dental Group',
-    is_certified: true,
-    service_areas: ['18301', '18302'],
-    mappings: {
-      gmb_account_id: 'gmb_apexdental_01',
-      ga4_property_id: 'ga4_apexdental_1029',
-      clarity_project_id: 'ms_clarity_apex_441',
-    },
-  },
-  {
-    id: 'd3e4f5a6-b7c8-9012-cdef-345678901234',
-    tenant_id: '00000000-0000-0000-0000-000000000001',
-    name: 'Kelly Hyundai of Stroudsburg',
-    is_certified: true,
-    service_areas: ['18360', '18301'],
-    mappings: {
-      gmb_account_id: 'gmb_kellyhyundai_01',
-      google_ads_id: 'ads_kellyhyundai_4412',
-      ga4_property_id: 'ga4_kellyhyundai_9012',
-      bing_webmaster_site_url: 'https://kellyhyundai.com',
-    },
-  },
-  {
-    id: 'e4f5a6b7-c8d9-0123-def0-456789012345',
-    tenant_id: '00000000-0000-0000-0000-000000000001',
-    name: 'CarBahn Corporate Office',
-    is_certified: true,
-    service_areas: ['94025'],
-    mappings: {
-      gmb_account_id: 'gmb_carbahn_corp_01',
-      gmb_location_id: 'loc_carbahn_94025',
-    },
-  },
-  {
-    id: 'f5a6b7c8-d9e0-1234-ef01-567890123456',
-    tenant_id: '00000000-0000-0000-0000-000000000001',
-    name: 'CarBahn Service & Repair Center',
-    is_certified: true,
-    service_areas: ['94025', '94026'],
-    mappings: {
-      gmb_account_id: 'gmb_carbahn_service_02',
-      gmb_location_id: 'loc_carbahn_svc_94025',
-    },
-  },
-];
-
-export const CANONICAL_CLIENTS = AUTHORITATIVE_CLIENT_REGISTRY;
+/**
+ * Deprecated static export retained strictly as an empty typed array so legacy
+ * server-route imports compile without injecting hardcoded or fixture clients.
+ */
+export const AUTHORITATIVE_CLIENT_REGISTRY: ClientProfile[] = [];
+export const CANONICAL_CLIENTS: ClientProfile[] = [];
 
 interface ClientContextType {
   activeClient: ClientProfile | null;
-  availableClients: ClientProfile[];
-  clients: ClientProfile[];
-  clientRegistry: ClientProfile[];
   setActiveClient: (client: ClientProfile) => void;
   setActiveClientId: (id: string) => void;
+  clientRegistry: ClientProfile[];
+  clients: ClientProfile[];
+  availableClients: ClientProfile[];
   isLoading: boolean;
+  error: string | null;
+  refreshClients: () => Promise<ClientProfile[]>;
 }
 
-const ClientContext = createContext<ClientContextType | undefined>(undefined);
+const ClientContext = createContext<ClientContextType>({
+  activeClient: null,
+  setActiveClient: () => {},
+  setActiveClientId: () => {},
+  clientRegistry: [],
+  clients: [],
+  availableClients: [],
+  isLoading: true,
+  error: null,
+  refreshClients: async () => [],
+});
 
-export function ClientProvider({ children }: { children: ReactNode }) {
-  const [activeClient, setActiveClientState] = useState<ClientProfile | null>(AUTHORITATIVE_CLIENT_REGISTRY[0]);
-  const [isLoading, setIsLoading] = useState<boolean>(false);
+const ACTIVE_CLIENT_STORAGE_KEY = 'pl_active_client_id_v2';
 
-  useEffect(() => {
-    const savedClientId = typeof window !== 'undefined' ? localStorage.getItem('porchlight_active_client_id') : null;
-    if (savedClientId) {
-      const match = AUTHORITATIVE_CLIENT_REGISTRY.find((c) => c.id === savedClientId);
-      if (match) {
-        setActiveClientState(match);
+export function ClientProvider({ children }: { children: React.ReactNode }) {
+  const [registry, setRegistry] = useState<ClientProfile[]>([]);
+  const [activeClient, setActiveClientState] = useState<ClientProfile | null>(null);
+  const [isLoading, setIsLoading] = useState<boolean>(true);
+  const [error, setError] = useState<string | null>(null);
+
+  const purgeClientCache = (previousClientId?: string) => {
+    if (typeof window === 'undefined' || !previousClientId) return;
+    localStorage.removeItem(`pl_insights_${previousClientId}`);
+    sessionStorage.removeItem(`pl_telemetry_${previousClientId}`);
+    sessionStorage.removeItem(`pl_serp_${previousClientId}`);
+  };
+
+  const refreshClients = useCallback(async (): Promise<ClientProfile[]> => {
+    setIsLoading(true);
+    setError(null);
+
+    try {
+      const res = await fetch('/api/clients', {
+        method: 'GET',
+        credentials: 'include',
+        headers: { 'Cache-Control': 'no-cache' },
+      });
+
+      if (res.status === 401 || res.status === 403) {
+        setRegistry([]);
+        setActiveClientState(null);
+        setError('AUTHENTICATION_REQUIRED');
+        return [];
       }
+
+      const data = await res.json();
+      if (!res.ok || !data.success || !Array.isArray(data.clients)) {
+        setError(data?.error?.message || 'Failed to load client registry.');
+        return [];
+      }
+
+      const loadedClients: ClientProfile[] = data.clients;
+      setRegistry(loadedClients);
+
+      if (loadedClients.length > 0) {
+        const urlParams =
+          typeof window !== 'undefined' ? new URLSearchParams(window.location.search) : null;
+        const urlClientId = urlParams?.get('clientId');
+        const storedClientId =
+          typeof window !== 'undefined' ? localStorage.getItem(ACTIVE_CLIENT_STORAGE_KEY) : null;
+
+        const preferred =
+          (urlClientId && loadedClients.find((c) => c.id === urlClientId)) ||
+          (storedClientId && loadedClients.find((c) => c.id === storedClientId)) ||
+          loadedClients.find((c) => c.is_certified) ||
+          loadedClients[0];
+
+        setActiveClientState(preferred || null);
+        if (preferred && typeof window !== 'undefined') {
+          localStorage.setItem(ACTIVE_CLIENT_STORAGE_KEY, preferred.id);
+        }
+      } else {
+        setActiveClientState(null);
+      }
+
+      return loadedClients;
+    } catch (err: any) {
+      setError(err?.message || 'Network error while loading clients.');
+      return [];
+    } finally {
+      setIsLoading(false);
     }
   }, []);
 
+  useEffect(() => {
+    refreshClients();
+  }, [refreshClients]);
+
   const setActiveClient = (client: ClientProfile) => {
-    setIsLoading(true);
+    purgeClientCache(activeClient?.id);
     setActiveClientState(client);
     if (typeof window !== 'undefined') {
-      localStorage.setItem('porchlight_active_client_id', client.id);
+      localStorage.setItem(ACTIVE_CLIENT_STORAGE_KEY, client.id);
     }
-    setTimeout(() => setIsLoading(false), 150);
   };
 
   const setActiveClientId = (id: string) => {
-    const match = AUTHORITATIVE_CLIENT_REGISTRY.find((c) => c.id === id);
-    if (match) {
-      setActiveClient(match);
+    const found = registry.find((c) => c.id === id);
+    if (found) {
+      setActiveClient(found);
     }
   };
 
@@ -164,12 +169,14 @@ export function ClientProvider({ children }: { children: ReactNode }) {
     <ClientContext.Provider
       value={{
         activeClient,
-        availableClients: AUTHORITATIVE_CLIENT_REGISTRY,
-        clients: AUTHORITATIVE_CLIENT_REGISTRY,
-        clientRegistry: AUTHORITATIVE_CLIENT_REGISTRY,
         setActiveClient,
         setActiveClientId,
+        clientRegistry: registry,
+        clients: registry,
+        availableClients: registry,
         isLoading,
+        error,
+        refreshClients,
       }}
     >
       {children}
@@ -178,9 +185,5 @@ export function ClientProvider({ children }: { children: ReactNode }) {
 }
 
 export function useClient() {
-  const context = useContext(ClientContext);
-  if (!context) {
-    throw new Error('useClient must be used within a ClientProvider');
-  }
-  return context;
+  return useContext(ClientContext);
 }
