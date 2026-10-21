@@ -31,6 +31,9 @@ export interface ClientProfile {
   id: string;
   tenant_id: string;
   name: string;
+  domain?: string;
+  timezone?: string;
+  currency?: string;
   address?: string;
   status?: 'active' | 'inactive' | 'onboarding' | 'legacy_unverified';
   is_certified: boolean;
@@ -43,10 +46,6 @@ export interface ClientProfile {
 
 export type Client = ClientProfile;
 
-/**
- * Retained strictly as typed empty arrays so legacy server imports compile
- * without injecting synthetic or hardcoded clients at runtime.
- */
 export const AUTHORITATIVE_CLIENT_REGISTRY: ClientProfile[] = [];
 export const CANONICAL_CLIENTS: ClientProfile[] = [];
 
