@@ -4,7 +4,7 @@ import { ClientProfile, ClientProfileMappings } from '../../../lib/client-contex
 
 export const dynamic = 'force-dynamic';
 
-export function normalizeClientRow(
+function normalizeClientRow(
   row: Record<string, any>,
   mappingsRows: Record<string, any>[] = []
 ): ClientProfile {
