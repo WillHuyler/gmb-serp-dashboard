@@ -44,8 +44,8 @@ export interface ClientProfile {
 export type Client = ClientProfile;
 
 /**
- * Deprecated static export retained strictly as an empty typed array so legacy
- * server-route imports compile without injecting hardcoded or fixture clients.
+ * Retained strictly as typed empty arrays so legacy server imports compile
+ * without injecting synthetic or hardcoded clients at runtime.
  */
 export const AUTHORITATIVE_CLIENT_REGISTRY: ClientProfile[] = [];
 export const CANONICAL_CLIENTS: ClientProfile[] = [];
