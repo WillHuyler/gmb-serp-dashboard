@@ -1,28 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { resolveAuthenticatedContext } from '../../../lib/auth-guard';
-import {
-  createServiceRoleSupabaseClient,
-  createUserScopedSupabaseClient,
-  extractAccessToken,
-} from '../../../lib/supabase/auth-server';
+import { resolveAuthenticatedContext, getServerSupabaseClient } from '../../../lib/auth-guard';
 import { ClientProfile, ClientProfileMappings } from '../../../lib/client-context';
 
 export const dynamic = 'force-dynamic';
 
-function getDbClient(req: NextRequest) {
-  try {
-    return createServiceRoleSupabaseClient();
-  } catch {
-    const token = extractAccessToken(req)!;
-    return createUserScopedSupabaseClient(token);
-  }
-}
-
-/**
- * Normalizes a raw public.clients row and its associated account_mappings rows
- * into the canonical ClientProfile shape. Never marks a client certified unless
- * both client.is_certified is true AND at least one valid account mapping exists.
- */
 export function normalizeClientRow(
   row: Record<string, any>,
   mappingsRows: Record<string, any>[] = []
@@ -70,10 +51,6 @@ export function normalizeClientRow(
   };
 }
 
-/**
- * GET /api/clients
- * Returns all clients belonging to the authenticated user's authorized tenants.
- */
 export async function GET(req: NextRequest) {
   const authCheck = await resolveAuthenticatedContext(req);
   if (!authCheck.authorized || !authCheck.context) {
@@ -83,7 +60,7 @@ export async function GET(req: NextRequest) {
   const { authorizedTenantIds } = authCheck.context;
 
   try {
-    const supabase = getDbClient(req);
+    const supabase = getServerSupabaseClient(req);
 
     const { data: clientRows, error: clientErr } = await supabase
       .from('clients')
@@ -132,11 +109,6 @@ export async function GET(req: NextRequest) {
   }
 }
 
-/**
- * POST /api/clients
- * Creates a new client in an unmapped, uncertified state under the user's verified tenant.
- * Never trusts an unauthorized tenant_id supplied in the request body.
- */
 export async function POST(req: NextRequest) {
   const authCheck = await resolveAuthenticatedContext(req);
   if (!authCheck.authorized || !authCheck.context) {
@@ -159,7 +131,6 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // If caller specifies a tenant_id, verify they actually belong to that tenant
     let targetTenantId = primaryTenantId;
     if (requested_tenant_id) {
       if (!authorizedTenantIds.includes(requested_tenant_id)) {
@@ -181,9 +152,8 @@ export async function POST(req: NextRequest) {
       ? service_areas.map((s) => String(s).trim()).filter(Boolean)
       : [];
 
-    const supabase = getDbClient(req);
+    const supabase = getServerSupabaseClient(req);
 
-    // Insert using verified schema columns; new clients always start unmapped & uncertified
     const insertPayload: Record<string, any> = {
       tenant_id: targetTenantId,
       name: name.trim(),
