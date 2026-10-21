@@ -1,8 +1,55 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { validateClientAccess, getServerSupabaseClient } from '../../../../lib/auth-guard';
-import { normalizeClientRow } from '../route';
+import { ClientProfile, ClientProfileMappings } from '../../../../lib/client-context';
 
 export const dynamic = 'force-dynamic';
+
+function normalizeClientRow(
+  row: Record<string, any>,
+  mappingsRows: Record<string, any>[] = []
+): ClientProfile {
+  const existingMappings: ClientProfileMappings =
+    row.mappings && typeof row.mappings === 'object' ? { ...row.mappings } : {};
+
+  for (const m of mappingsRows) {
+    const provider = String(m.provider || m.provider_type || '').toLowerCase();
+    const externalId = m.external_account_id || m.provider_account_id || m.resource_id;
+    if (!externalId) continue;
+
+    if (provider === 'google_ads') existingMappings.google_ads_id = externalId;
+    if (provider === 'meta_ads' || provider === 'meta') existingMappings.meta_act_id = externalId;
+    if (provider === 'ga4') existingMappings.ga4_property_id = externalId;
+    if (provider === 'gsc') existingMappings.gsc_site_url = externalId;
+    if (provider === 'gmb' || provider === 'gbp') {
+      existingMappings.gmb_location_id = m.location_id || externalId;
+      existingMappings.gmb_account_id = m.account_id || externalId;
+    }
+    if (provider === 'brightlocal') existingMappings.brightlocal_location_id = externalId;
+    if (provider === 'serpapi') existingMappings.serpapi_location_key = externalId;
+    if (provider === 'bing_webmaster') existingMappings.bing_webmaster_site_url = externalId;
+    if (provider === 'clarity') existingMappings.clarity_project_id = externalId;
+  }
+
+  const mappedKeysCount = Object.values(existingMappings).filter(
+    (v) => typeof v === 'string' && v.trim() !== ''
+  ).length;
+
+  const isCertified = Boolean(row.is_certified === true && mappedKeysCount > 0);
+
+  return {
+    id: row.id,
+    tenant_id: row.tenant_id,
+    name: row.name || 'Unnamed Client',
+    address: row.address || row.location_address || '',
+    status: row.status || (isCertified ? 'active' : 'onboarding'),
+    is_certified: isCertified,
+    service_areas: Array.isArray(row.service_areas) ? row.service_areas : [],
+    mappings: existingMappings,
+    mapped_resource_count: mappedKeysCount,
+    last_sync_at: row.last_sync_at || null,
+    created_at: row.created_at,
+  };
+}
 
 export async function GET(
   req: NextRequest,
