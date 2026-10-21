@@ -9,28 +9,29 @@ export const dynamic = 'force-dynamic';
 
 function ClientPortfolioContent() {
   const router = useRouter();
-  const { activeClient, setActiveClient, clientRegistry, isLoading, refreshClients } = useClient();
+  const { activeClient, setActiveClient, clientRegistry, isLoading, error, refreshClients } = useClient();
 
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<'ALL' | 'CERTIFIED' | 'UNMAPPED'>('ALL');
 
   const [showAddModal, setShowAddModal] = useState(false);
   const [newName, setNewName] = useState('');
-  const [newAddress, setNewAddress] = useState('');
-  const [newZips, setNewZips] = useState('');
+  const [newDomain, setNewDomain] = useState('');
+  const [newTimezone, setNewTimezone] = useState('America/New_York');
+  const [newCurrency, setNewCurrency] = useState('USD');
   const [submitting, setSubmitting] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
 
   const [editingClient, setEditingClient] = useState<ClientProfile | null>(null);
   const [editName, setEditName] = useState('');
-  const [editAddress, setEditAddress] = useState('');
-  const [editZips, setEditZips] = useState('');
+  const [editDomain, setEditDomain] = useState('');
+  const [editTimezone, setEditTimezone] = useState('America/New_York');
+  const [editCurrency, setEditCurrency] = useState('USD');
 
   const filteredClients = clientRegistry.filter((client) => {
     const matchesSearch =
       client.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      (client.address || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
-      (client.service_areas || []).some((z) => z.includes(searchQuery));
+      (client.domain || '').toLowerCase().includes(searchQuery.toLowerCase());
 
     if (!matchesSearch) return false;
     if (statusFilter === 'CERTIFIED') return client.is_certified;
@@ -44,18 +45,15 @@ function ClientPortfolioContent() {
     setSubmitting(true);
 
     try {
-      const zipsArray = newZips
-        .split(',')
-        .map((z) => z.trim())
-        .filter(Boolean);
-
       const res = await fetch('/api/clients', {
         method: 'POST',
+        credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           name: newName.trim(),
-          address: newAddress.trim(),
-          service_areas: zipsArray,
+          domain: newDomain.trim() || null,
+          timezone: newTimezone.trim() || 'America/New_York',
+          currency: newCurrency.trim() || 'USD',
         }),
       });
 
@@ -70,8 +68,7 @@ function ClientPortfolioContent() {
       setActiveClient(data.client);
       setShowAddModal(false);
       setNewName('');
-      setNewAddress('');
-      setNewZips('');
+      setNewDomain('');
     } catch (err: any) {
       setFormError(err?.message || 'Unexpected error creating client.');
     } finally {
@@ -82,8 +79,9 @@ function ClientPortfolioContent() {
   const openEditDrawer = (client: ClientProfile) => {
     setEditingClient(client);
     setEditName(client.name);
-    setEditAddress(client.address || '');
-    setEditZips((client.service_areas || []).join(', '));
+    setEditDomain(client.domain || '');
+    setEditTimezone(client.timezone || 'America/New_York');
+    setEditCurrency(client.currency || 'USD');
     setFormError(null);
   };
 
@@ -94,18 +92,15 @@ function ClientPortfolioContent() {
     setSubmitting(true);
 
     try {
-      const zipsArray = editZips
-        .split(',')
-        .map((z) => z.trim())
-        .filter(Boolean);
-
       const res = await fetch(`/api/clients/${editingClient.id}`, {
         method: 'PATCH',
+        credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           name: editName.trim(),
-          address: editAddress.trim(),
-          service_areas: zipsArray,
+          domain: editDomain.trim() || null,
+          timezone: editTimezone.trim(),
+          currency: editCurrency.trim(),
         }),
       });
 
@@ -142,7 +137,7 @@ function ClientPortfolioContent() {
           </span>
           <h1 className="text-2xl font-bold tracking-tight text-white mt-1">Client Portfolio</h1>
           <p className="text-sm text-slate-400 mt-1">
-            Manage client profiles, service geographies, provider resource mappings, and data certification status.
+            Manage client profiles, domains, provider resource mappings, and data certification status.
           </p>
         </div>
 
@@ -170,7 +165,7 @@ function ClientPortfolioContent() {
           type="text"
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
-          placeholder="Search clients by name, address, or ZIP code..."
+          placeholder="Search clients by name or domain..."
           className="w-full sm:max-w-md bg-[#151D2A] border border-[#A9C7E5]/20 rounded-lg px-3.5 py-2 text-sm text-white focus:outline-none focus:border-[#D99614]"
         />
 
@@ -203,7 +198,7 @@ function ClientPortfolioContent() {
                 : 'bg-[#151D2A] text-slate-400 border-[#A9C7E5]/10'
             }`}
           >
-            Unmapped ({clientRegistry.filter((c) => !c.is_certified).length})
+            Uncertified / Onboarding ({clientRegistry.filter((c) => !c.is_certified).length})
           </button>
         </div>
       </div>
@@ -211,6 +206,19 @@ function ClientPortfolioContent() {
       {isLoading ? (
         <div className="p-12 rounded-xl bg-[#111622] border border-[#A9C7E5]/10 text-center text-sm text-slate-400">
           Loading authorized client registry from Supabase...
+        </div>
+      ) : error === 'AUTHENTICATION_REQUIRED' ? (
+        <div className="p-12 rounded-xl bg-[#111622] border border-amber-500/20 text-center space-y-4">
+          <h2 className="text-lg font-bold text-white">Authentication Required</h2>
+          <p className="text-xs text-slate-400 max-w-md mx-auto">
+            Sign in with your authorized agency credentials to view and manage client records.
+          </p>
+          <button
+            onClick={() => router.push('/login')}
+            className="px-4 py-2 bg-[#D99614] text-[#0B0F17] font-semibold text-xs rounded-lg"
+          >
+            Sign In
+          </button>
         </div>
       ) : filteredClients.length === 0 ? (
         <div className="p-12 rounded-xl bg-[#111622] border border-[#A9C7E5]/10 text-center space-y-3">
@@ -223,9 +231,7 @@ function ClientPortfolioContent() {
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
           {filteredClients.map((client) => {
             const isSelected = activeClient?.id === client.id;
-            const mappedCount =
-              client.mapped_resource_count ??
-              Object.values(client.mappings || {}).filter(Boolean).length;
+            const mappedCount = client.mapped_resource_count ?? 0;
 
             return (
               <div
@@ -241,7 +247,7 @@ function ClientPortfolioContent() {
                     <div>
                       <h3 className="text-base font-bold text-white">{client.name}</h3>
                       <p className="text-xs text-slate-400 mt-0.5">
-                        {client.address || 'No physical address configured'}
+                        {client.domain || 'No domain configured'}
                       </p>
                     </div>
                     <span
@@ -251,7 +257,7 @@ function ClientPortfolioContent() {
                           : 'bg-amber-500/10 text-amber-400 border-amber-500/25'
                       }`}
                     >
-                      {client.is_certified ? 'CERTIFIED' : 'UNMAPPED'}
+                      {client.is_certified ? 'CERTIFIED' : 'UNCERTIFIED'}
                     </span>
                   </div>
 
@@ -263,13 +269,9 @@ function ClientPortfolioContent() {
                       </span>
                     </div>
                     <div>
-                      <span className="text-slate-500 block text-[11px]">Service Areas</span>
+                      <span className="text-slate-500 block text-[11px]">Timezone / Currency</span>
                       <span className="text-slate-200 font-mono font-semibold">
-                        {client.service_areas?.length > 0
-                          ? `${client.service_areas.slice(0, 3).join(', ')}${
-                              client.service_areas.length > 3 ? '...' : ''
-                            }`
-                          : 'Not Configured'}
+                        {client.timezone || 'America/New_York'} ({client.currency || 'USD'})
                       </span>
                     </div>
                   </div>
@@ -334,27 +336,35 @@ function ClientPortfolioContent() {
               </div>
 
               <div>
-                <label className="text-xs font-medium text-slate-300 block mb-1">Primary Location Address</label>
+                <label className="text-xs font-medium text-slate-300 block mb-1">Primary Website Domain</label>
                 <input
                   type="text"
-                  value={newAddress}
-                  onChange={(e) => setNewAddress(e.target.value)}
-                  placeholder="e.g., 1534 N 9th St, Stroudsburg, PA 18360"
+                  value={newDomain}
+                  onChange={(e) => setNewDomain(e.target.value)}
+                  placeholder="e.g., https://kellyhyundai.com"
                   className="w-full bg-[#151D2A] border border-[#A9C7E5]/20 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-[#D99614]"
                 />
               </div>
 
-              <div>
-                <label className="text-xs font-medium text-slate-300 block mb-1">
-                  Target Service Area ZIPs (Comma-separated)
-                </label>
-                <input
-                  type="text"
-                  value={newZips}
-                  onChange={(e) => setNewZips(e.target.value)}
-                  placeholder="e.g., 18360, 18301, 18302"
-                  className="w-full bg-[#151D2A] border border-[#A9C7E5]/20 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-[#D99614]"
-                />
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-xs font-medium text-slate-300 block mb-1">Timezone</label>
+                  <input
+                    type="text"
+                    value={newTimezone}
+                    onChange={(e) => setNewTimezone(e.target.value)}
+                    className="w-full bg-[#151D2A] border border-[#A9C7E5]/20 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-[#D99614]"
+                  />
+                </div>
+                <div>
+                  <label className="text-xs font-medium text-slate-300 block mb-1">Currency</label>
+                  <input
+                    type="text"
+                    value={newCurrency}
+                    onChange={(e) => setNewCurrency(e.target.value)}
+                    className="w-full bg-[#151D2A] border border-[#A9C7E5]/20 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-[#D99614]"
+                  />
+                </div>
               </div>
 
               <div className="pt-2 flex justify-end space-x-2">
@@ -407,25 +417,34 @@ function ClientPortfolioContent() {
               </div>
 
               <div>
-                <label className="text-xs font-medium text-slate-300 block mb-1">Primary Location Address</label>
+                <label className="text-xs font-medium text-slate-300 block mb-1">Primary Website Domain</label>
                 <input
                   type="text"
-                  value={editAddress}
-                  onChange={(e) => setEditAddress(e.target.value)}
+                  value={editDomain}
+                  onChange={(e) => setEditDomain(e.target.value)}
                   className="w-full bg-[#151D2A] border border-[#A9C7E5]/20 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-[#D99614]"
                 />
               </div>
 
-              <div>
-                <label className="text-xs font-medium text-slate-300 block mb-1">
-                  Target Service Area ZIPs (Comma-separated)
-                </label>
-                <input
-                  type="text"
-                  value={editZips}
-                  onChange={(e) => setEditZips(e.target.value)}
-                  className="w-full bg-[#151D2A] border border-[#A9C7E5]/20 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-[#D99614]"
-                />
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-xs font-medium text-slate-300 block mb-1">Timezone</label>
+                  <input
+                    type="text"
+                    value={editTimezone}
+                    onChange={(e) => setEditTimezone(e.target.value)}
+                    className="w-full bg-[#151D2A] border border-[#A9C7E5]/20 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-[#D99614]"
+                  />
+                </div>
+                <div>
+                  <label className="text-xs font-medium text-slate-300 block mb-1">Currency</label>
+                  <input
+                    type="text"
+                    value={editCurrency}
+                    onChange={(e) => setEditCurrency(e.target.value)}
+                    className="w-full bg-[#151D2A] border border-[#A9C7E5]/20 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-[#D99614]"
+                  />
+                </div>
               </div>
 
               <div className="pt-2 flex justify-end space-x-2">
