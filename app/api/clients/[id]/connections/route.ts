@@ -1,10 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { validateClientAccess } from '../../../../../lib/auth-guard';
-import {
-  createServiceRoleSupabaseClient,
-  createUserScopedSupabaseClient,
-  extractAccessToken,
-} from '../../../../../lib/supabase/auth-server';
+import { validateClientAccess, getServerSupabaseClient } from '../../../../../lib/auth-guard';
 
 export const dynamic = 'force-dynamic';
 
@@ -13,18 +8,13 @@ export async function GET(
   { params }: { params: { id: string } }
 ) {
   const clientId = params.id;
-  const authCheck = await validateClientAccess(req, clientId);
+  const authCheck = await validateClientAccess(req, clientId, true);
   if (!authCheck.authorized || !authCheck.context) {
     return authCheck.errorResponse!;
   }
 
   try {
-    let supabase;
-    try {
-      supabase = createServiceRoleSupabaseClient();
-    } catch {
-      supabase = createUserScopedSupabaseClient(extractAccessToken(req)!);
-    }
+    const supabase = getServerSupabaseClient(req);
 
     const [clientRes, mappingsRes, integrationAccountsRes] = await Promise.all([
       supabase
