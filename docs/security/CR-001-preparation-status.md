@@ -1,51 +1,47 @@
-# CR-001 — Implementation preparation status
+# CR-001 — Preparation status / release gate
 
-**Date:** 2026-10-21
-**Status:** AUTH/RLS DISCOVERY BLOCKED — preparatory code ONLY
-**Working branch:** `feature/cr-001-auth-contract-prep-20261021`
-**Reference:** [Design PR #1](https://github.com/WillHuyler/gmb-serp-dashboard/pull/1)
+**Date:** 2026-10-21  
+**Branch:** `feature/cr-001-auth-contract-prep-20261021`  
+**PR:** [Draft PR #2](https://github.com/WillHuyler/gmb-serp-dashboard/pull/2)  
+**Status:** SOURCE + DATABASE METADATA INSPECTED; APPLICATION INTEGRATION **NOT APPROVED**.
 
-## Completed with no runtime impact
+## Completed (isolated branch only)
 
-- Added `lib/security/cr001-authorization-policy.ts`, a **pure, unused** policy evaluator with typed failure outcomes.
-- Added `docs/security/CR-001-supabase-readonly-contract-checks.sql`, containing SELECT-only Supabase catalog inspection queries.
-- The branch starts from main commit `638cc0ea7e0630516166455c34e387bf34417134`.
-- There have been no edits to `lib/auth-guard.ts`, routes, database, environment files, CI configuration, or deployment settings.
+- `lib/security/cr001-authorization-policy.ts`: pure, unused typed authorization-decision function.
+- `lib/security/cr001-supabase-principal.ts`: unused verifier for a Supabase Auth access token using `supabase.auth.getUser(jwt)`, requiring a separate tenant/client check.
+- `docs/security/CR-001-supabase-readonly-contract-checks.sql`: SELECT-only metadata queries.
+- Source audit: identifies mock server authorization, missing application sign-in/session propagation and client API trust issues.
+- Authorized read-only Supabase metadata review: project, Auth/profile existence, tables, RLS configuration, constraints, adviser findings. **No database write or RLS configuration change.**
 
-## Confirmed from GitHub repository scan
+## Verified design implications (public-safe summary)
 
-- `lib/auth-guard.ts` currently defines fixed mock principal and a client allowlist.
-- The main repository does not contain actual Supabase RLS policies, membership table migrations, or proof of the production auth provider.
-- Other connected repositories also did not yield an authoritative schema for PorchLight. That is **not evidence that RLS doesn't exist** in Supabase.
-- The Supabase plugin has been installed, but its database-operation endpoints were not exposed in this active execution environment. Therefore real Auth/RLS contracts remain **UNVERIFIED**.
+- Supabase Auth and linked user profile tables exist.
+- A tenant membership table exists but its current population does not support switching directly to mandatory membership checks without an account-recovery/bootstrap plan.
+- Multiple authorization/row-isolation findings require **restricted security review and remediation**. Detailed findings deliberately are NOT committed to this public repository.
+- The repository lacks a verified mechanism to propagate Supabase Auth sessions from the browser to Next.js API routes. Do not wire in the unused token verifier until a session transport is approved.
+- Existing clients and tenant IDs must be inventoried without reassignment or deletion.
+- App-level authorization, RLS, provider resource scope, and service-token permission are independently required controls.
 
-## Remains blocked (DO NOT IMPLEMENT YET)
+## Blocking implementation decisions
 
-- Any rewrite of `validateClientAccess` or authenticated API handlers.
-- Any change to Supabase RLS, tenancy, schema, service role usage or database records.
-- Any real client mapping or production ingestion.
-- Any merge or Vercel deployment.
+1. Approve existing Supabase Auth as application identity provider and a secure browser/server session transport for Next.js 14.
+2. Review privileged user bootstrap when membership records are absent, without introducing a permanent default-tenant fallback.
+3. Approve separate staged remediation plan for exposed tables, overly permissive policies, and privileged database functions.
+4. Validate a two-tenant negative-path matrix against an isolated safe test environment before production.
+5. Confirm which Vercel deployment/branch and SQL project the actual running app uses.
 
-## Read-only evidence needed
+## Approval states
 
-1. Confirm correct Supabase project and whether sign-in uses Supabase Auth or existing external identity provider.
-2. Inspect table names, columns, FKs, unique constraints, tenant membership tables, RLS policy expressions, and roles/grants.
-3. Inspect current session propagation mechanism in Vercel (cookies/headers/auth middleware).
-4. Determine whether the current deployment contains an externally hosted OAuth/auth proxy omitted from this repository.
-5. Verify against two isolated test principals after a plan is approved.
+- Initial read-only investigation: approved and completed.
+- Branch-local, unused CR-001 implementation prototypes: approved and prepared.
+- Importing auth module into routes: NOT approved.
+- Applying DDL, creating users or memberships, replacing RLS policies: NOT approved.
+- Merging, production deployment, data import: NOT approved.
 
-## Authorization policy integration guard
+## Verification status
 
-`AuthenticatedPrincipal`, `VerifiedTenantMembership`, and `ResolvedClientOwnership` are **trusted-input boundary types**, not security enforcement themselves. All inputs must be obtained by server-verified mechanisms and must remain scoped by RLS or equivalent server authorization. The pure policy module is intentionally NOT imported into any production handler.
-
-## Approval / release
-
-Existing owner authorization covers **preparation on isolated branch only**. It does not authorize wiring in a new auth provider, changing production database/schema, enabling access to real clients, merging the branch, or deploying.
-
-## Test status
-
-- Source review: completed.
-- Compilation: not run.
-- Unit and integration tests: not run.
-- Two-user/two-tenant RLS and session tests: blocked until DB access.
-- Deployment: not attempted.
+- Code and metadata review: performed.
+- Actual auth login/session route and end-to-end access: NOT verified.
+- Unit/build/browser tests: NOT run.
+- Production changes: NONE.
+- Next step: owner review of private security findings, selected session approach, and proposed ordered security remediation.
