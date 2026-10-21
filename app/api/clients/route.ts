@@ -1,55 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { resolveAuthenticatedContext, getServerSupabaseClient } from '../../../lib/auth-guard';
-import { ClientProfile, ClientProfileMappings } from '../../../lib/client-context';
+import { normalizeVerifiedClientRecord, JoinedAccountMapping } from '../../../lib/client-row-normalizer';
+import { ClientProfile } from '../../../lib/client-context';
 
 export const dynamic = 'force-dynamic';
-
-function normalizeClientRow(
-  row: Record<string, any>,
-  mappingsRows: Record<string, any>[] = []
-): ClientProfile {
-  const existingMappings: ClientProfileMappings =
-    row.mappings && typeof row.mappings === 'object' ? { ...row.mappings } : {};
-
-  for (const m of mappingsRows) {
-    const provider = String(m.provider || m.provider_type || '').toLowerCase();
-    const externalId = m.external_account_id || m.provider_account_id || m.resource_id;
-    if (!externalId) continue;
-
-    if (provider === 'google_ads') existingMappings.google_ads_id = externalId;
-    if (provider === 'meta_ads' || provider === 'meta') existingMappings.meta_act_id = externalId;
-    if (provider === 'ga4') existingMappings.ga4_property_id = externalId;
-    if (provider === 'gsc') existingMappings.gsc_site_url = externalId;
-    if (provider === 'gmb' || provider === 'gbp') {
-      existingMappings.gmb_location_id = m.location_id || externalId;
-      existingMappings.gmb_account_id = m.account_id || externalId;
-    }
-    if (provider === 'brightlocal') existingMappings.brightlocal_location_id = externalId;
-    if (provider === 'serpapi') existingMappings.serpapi_location_key = externalId;
-    if (provider === 'bing_webmaster') existingMappings.bing_webmaster_site_url = externalId;
-    if (provider === 'clarity') existingMappings.clarity_project_id = externalId;
-  }
-
-  const mappedKeysCount = Object.values(existingMappings).filter(
-    (v) => typeof v === 'string' && v.trim() !== ''
-  ).length;
-
-  const isCertified = Boolean(row.is_certified === true && mappedKeysCount > 0);
-
-  return {
-    id: row.id,
-    tenant_id: row.tenant_id,
-    name: row.name || 'Unnamed Client',
-    address: row.address || row.location_address || '',
-    status: row.status || (isCertified ? 'active' : 'onboarding'),
-    is_certified: isCertified,
-    service_areas: Array.isArray(row.service_areas) ? row.service_areas : [],
-    mappings: existingMappings,
-    mapped_resource_count: mappedKeysCount,
-    last_sync_at: row.last_sync_at || null,
-    created_at: row.created_at,
-  };
-}
 
 export async function GET(req: NextRequest) {
   const authCheck = await resolveAuthenticatedContext(req);
@@ -62,9 +16,10 @@ export async function GET(req: NextRequest) {
   try {
     const supabase = getServerSupabaseClient(req);
 
+    // Query only verified columns on public.clients
     const { data: clientRows, error: clientErr } = await supabase
       .from('clients')
-      .select('*')
+      .select('id, tenant_id, name, domain, timezone, currency, is_certified, created_at')
       .in('tenant_id', authorizedTenantIds)
       .order('name', { ascending: true });
 
@@ -76,19 +31,44 @@ export async function GET(req: NextRequest) {
     }
 
     const clientIds = (clientRows || []).map((c: any) => c.id);
-    let accountMappings: any[] = [];
+    let joinedMappings: JoinedAccountMapping[] = [];
+    const clientsWithMetrics = new Set<string>();
 
     if (clientIds.length > 0) {
-      const { data: mapRows } = await supabase
-        .from('account_mappings')
-        .select('*')
-        .in('client_id', clientIds);
-      accountMappings = mapRows || [];
+      const [mapRes, externalRes, metricsRes] = await Promise.all([
+        supabase
+          .from('account_mappings')
+          .select('id, tenant_id, client_id, external_account_id, mapping_role, mapping_confidence, is_confirmed, include_in_command_center, created_at')
+          .in('client_id', clientIds)
+          .in('tenant_id', authorizedTenantIds),
+        supabase
+          .from('external_accounts')
+          .select('id, provider, external_account_id, descriptive_name, account_type, status'),
+        supabase
+          .from('daily_client_metrics')
+          .select('client_id')
+          .in('client_id', clientIds)
+          .limit(500),
+      ]);
+
+      const externalMap = new Map<string, any>();
+      (externalRes.data || []).forEach((ext: any) => {
+        externalMap.set(ext.id, ext);
+      });
+
+      joinedMappings = (mapRes.data || []).map((m: any) => ({
+        ...m,
+        external_account: externalMap.get(m.external_account_id) || null,
+      }));
+
+      (metricsRes.data || []).forEach((m: any) => {
+        if (m?.client_id) clientsWithMetrics.add(m.client_id);
+      });
     }
 
     const normalized: ClientProfile[] = (clientRows || []).map((row: any) => {
-      const clientMaps = accountMappings.filter((m) => m.client_id === row.id);
-      return normalizeClientRow(row, clientMaps);
+      const clientMaps = joinedMappings.filter((m) => m.client_id === row.id);
+      return normalizeVerifiedClientRecord(row, clientMaps, clientsWithMetrics.has(row.id));
     });
 
     return NextResponse.json({
@@ -119,7 +99,7 @@ export async function POST(req: NextRequest) {
 
   try {
     const body = await req.json();
-    const { name, address, service_areas, requested_tenant_id } = body || {};
+    const { name, domain, timezone, currency, requested_tenant_id } = body || {};
 
     if (!name || typeof name !== 'string' || name.trim().length < 2) {
       return NextResponse.json(
@@ -148,28 +128,22 @@ export async function POST(req: NextRequest) {
       targetTenantId = requested_tenant_id;
     }
 
-    const parsedServiceAreas = Array.isArray(service_areas)
-      ? service_areas.map((s) => String(s).trim()).filter(Boolean)
-      : [];
-
     const supabase = getServerSupabaseClient(req);
 
+    // Strictly insert verified public.clients schema columns only
     const insertPayload: Record<string, any> = {
       tenant_id: targetTenantId,
       name: name.trim(),
+      domain: typeof domain === 'string' && domain.trim() !== '' ? domain.trim() : null,
+      timezone: typeof timezone === 'string' && timezone.trim() !== '' ? timezone.trim() : 'America/New_York',
+      currency: typeof currency === 'string' && currency.trim() !== '' ? currency.trim() : 'USD',
       is_certified: false,
-      service_areas: parsedServiceAreas,
-      mappings: {},
     };
-
-    if (address && typeof address === 'string') {
-      insertPayload.address = address.trim();
-    }
 
     const { data: inserted, error: insertErr } = await supabase
       .from('clients')
       .insert([insertPayload])
-      .select('*')
+      .select('id, tenant_id, name, domain, timezone, currency, is_certified, created_at')
       .single();
 
     if (insertErr || !inserted) {
@@ -185,7 +159,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json(
       {
         success: true,
-        client: normalizeClientRow(inserted, []),
+        client: normalizeVerifiedClientRecord(inserted, [], false),
       },
       { status: 201 }
     );
