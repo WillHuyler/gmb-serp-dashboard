@@ -54,6 +54,7 @@ export interface ClientProfile {
   provenance_reason?: string;
   data_certification_status?: string;
   type?: 'REAL' | 'TEST';
+  mapped_resource_count?: number;
   mapped_accounts_count?: number;
   verified_providers_count?: number;
   created_at?: string;
@@ -61,12 +62,11 @@ export interface ClientProfile {
   organization_id?: string | null;
   service_areas: string[];
   mappings: ClientMappings;
+  [key: string]: any;
 }
 
 export type Client = ClientProfile;
 
-// CR-011 Requirement 8: Production client registry fallback removed.
-// Exported as empty arrays strictly for backwards-compatible import signatures.
 export const AUTHORITATIVE_CLIENT_REGISTRY: ClientProfile[] = [];
 export const CANONICAL_CLIENTS: ClientProfile[] = [];
 
@@ -90,127 +90,9 @@ export function ClientProvider({ children }: { children: ReactNode }) {
   const [clientList, setClientList] = useState<ClientProfile[]>([]);
   const [activeClient, setActiveClientState] = useState<ClientProfile | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(true);
-  const [authStatus, setAuthStatus] = useState<
-    'loading' | 'authenticated' | 'unauthenticated' | 'forbidden' | 'error'
-  >('loading');
+  const [authStatus, setAuthStatus] = useState<'loading' | 'authenticated' | 'unauthenticated' | 'forbidden' | 'error'>('loading');
   const [error, setError] = useState<string | null>(null);
 
   const refreshClients = useCallback(async () => {
     setIsLoading(true);
-    setError(null);
-    try {
-      const res = await fetch('/api/clients', {
-        cache: 'no-store',
-        credentials: 'include',
-      });
-
-      if (res.status === 401) {
-        setClientList([]);
-        setActiveClientState(null);
-        setAuthStatus('unauthenticated');
-        setError('Authentication required (401). Please sign in to access client records.');
-        return;
-      }
-
-      if (res.status === 403) {
-        setClientList([]);
-        setActiveClientState(null);
-        setAuthStatus('forbidden');
-        setError('Access forbidden (403). Your account is not authorized for this tenant.');
-        return;
-      }
-
-      if (!res.ok) {
-        const errPayload = await res.json().catch(() => ({}));
-        setClientList([]);
-        setActiveClientState(null);
-        setAuthStatus('error');
-        setError(errPayload.message || `Failed to load clients (HTTP ${res.status}).`);
-        return;
-      }
-
-      const data = await res.json();
-      const loadedClients: ClientProfile[] = Array.isArray(data.clients) ? data.clients : [];
-      setClientList(loadedClients);
-      setAuthStatus('authenticated');
-
-      if (loadedClients.length === 0) {
-        setActiveClientState(null);
-        return;
-      }
-
-      const urlParams =
-        typeof window !== 'undefined' ? new URLSearchParams(window.location.search) : null;
-      const urlClientId = urlParams?.get('clientId');
-      const savedId =
-        typeof window !== 'undefined'
-          ? localStorage.getItem('porchlight_active_client_id')
-          : null;
-
-      const targetId = urlClientId || savedId;
-      const matched = loadedClients.find((c) => c.id === targetId) || loadedClients[0];
-      setActiveClientState(matched);
-    } catch (err: any) {
-      setClientList([]);
-      setActiveClientState(null);
-      setAuthStatus('error');
-      setError(err?.message || 'Network error while loading authorized clients.');
-    } finally {
-      setIsLoading(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    refreshClients();
-  }, [refreshClients]);
-
-  const setActiveClient = (client: ClientProfile | null) => {
-    setIsLoading(true);
-    // Atomically clear previous client state before setting next client
-    setActiveClientState(client);
-    if (typeof window !== 'undefined') {
-      if (client) {
-        localStorage.setItem('porchlight_active_client_id', client.id);
-      } else {
-        localStorage.removeItem('porchlight_active_client_id');
-      }
-    }
-    setTimeout(() => setIsLoading(false), 50);
-  };
-
-  const setActiveClientId = (id: string) => {
-    const match = clientList.find((c) => c.id === id) || null;
-    setActiveClient(match);
-  };
-
-  const addClient = (newClient: ClientProfile) => {
-    setClientList((prev) => [...prev, newClient]);
-    setActiveClient(newClient);
-  };
-
-  return (
-    <ClientContext.Provider
-      value={{
-        activeClient,
-        availableClients: clientList,
-        clients: clientList,
-        clientRegistry: clientList,
-        setActiveClient,
-        setActiveClientId,
-        addClient,
-        refreshClients,
-        isLoading,
-        authStatus,
-        error,
-      }}
-    >
-      {children}
-    </ClientContext.Provider>
-  );
-}
-
-export function useClient() {
-  const context = useContext(ClientContext);
-  if (!context) throw new Error('useClient must be used within a ClientProvider');
-  return context;
-}
+    set
