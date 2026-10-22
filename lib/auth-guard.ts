@@ -6,9 +6,13 @@ import {
   evaluateClientAccessPolicy,
 } from './auth-policy';
 
+export const AUTH_COOKIE_ACCESS = 'sb-access-token';
+export const AUTH_COOKIE_REFRESH = 'sb-refresh-token';
+
 export interface AuthSessionContext {
   userId: string;
   email?: string | null;
+  role?: string;
   tenantId: string;
   authorizedTenantIds: string[];
   isSuperAdmin: boolean;
@@ -23,17 +27,16 @@ export interface AuthValidationResult {
   response?: NextResponse;
 }
 
-function extractAccessToken(req: NextRequest): string | null {
+export function extractAccessToken(req: NextRequest): string | null {
   const authHeader = req.headers.get('authorization') || req.headers.get('Authorization');
   if (authHeader && authHeader.startsWith('Bearer ')) {
     const token = authHeader.slice(7).trim();
     if (token) return token;
   }
 
-  // Inspect standard Supabase Auth cookies (sb-*-auth-token or sb-access-token)
   const cookies = req.cookies.getAll();
   for (const cookie of cookies) {
-    if (cookie.name === 'sb-access-token' && cookie.value) {
+    if (cookie.name === AUTH_COOKIE_ACCESS && cookie.value) {
       return cookie.value;
     }
     if (cookie.name.startsWith('sb-') && cookie.name.endsWith('-auth-token') && cookie.value) {
@@ -46,7 +49,6 @@ function extractAccessToken(req: NextRequest): string | null {
           return parsed.access_token;
         }
       } catch {
-        // If raw JWT string in cookie
         if (cookie.value.split('.').length === 3) {
           return cookie.value;
         }
@@ -57,21 +59,36 @@ function extractAccessToken(req: NextRequest): string | null {
   return null;
 }
 
+/**
+ * Creates a Supabase client for server-side operations AFTER authentication is verified,
+ * or scoped to a specific user access token when provided.
+ */
+export function getServerSupabaseClient(accessToken?: string | null): SupabaseClient {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
+  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || '';
+  const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
+
+  if (accessToken && url && anonKey) {
+    return createClient(url, anonKey, {
+      auth: { persistSession: false, autoRefreshToken: false },
+      global: { headers: { Authorization: `Bearer ${accessToken}` } },
+    });
+  }
+
+  const effectiveKey = serviceKey || anonKey;
+  return createClient(url, effectiveKey, {
+    auth: { persistSession: false, autoRefreshToken: false },
+  });
+}
+
 function createScopedServerClient(accessToken: string): SupabaseClient | null {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
   const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
   if (!url || !anonKey) return null;
 
   return createClient(url, anonKey, {
-    auth: {
-      persistSession: false,
-      autoRefreshToken: false,
-    },
-    global: {
-      headers: {
-        Authorization: `Bearer ${accessToken}`,
-      },
-    },
+    auth: { persistSession: false, autoRefreshToken: false },
+    global: { headers: { Authorization: `Bearer ${accessToken}` } },
   });
 }
 
@@ -89,8 +106,7 @@ function createInternalMetadataVerifier(): SupabaseClient | null {
 }
 
 /**
- * Resolves and verifies the caller's Supabase Auth session before any database query is allowed.
- * Never falls back to service-role data when no valid user token is present.
+ * CR-011: Require a valid Supabase Auth session before accessing private records.
  */
 export async function requireAuthenticatedSession(
   req: NextRequest,
@@ -141,7 +157,6 @@ export async function requireAuthenticatedSession(
     return { authorized: false, status: 401, errorResponse: err, response: err };
   }
 
-  // Verify tenant memberships and profile super-admin role from server-side tables
   const [{ data: profileRow }, { data: membershipRows }] = await Promise.all([
     metadataClient
       .from('profiles')
@@ -168,7 +183,6 @@ export async function requireAuthenticatedSession(
     )
   );
 
-  // Controlled bootstrap path for verified super_admin profile when tenant_memberships is empty
   if (isSuperAdmin && authorizedTenantIds.length === 0) {
     const { data: allTenants } = await metadataClient
       .from('tenants')
@@ -207,12 +221,23 @@ export async function requireAuthenticatedSession(
     context: {
       userId: user.id,
       email: user.email,
+      role: isSuperAdmin ? 'PLATFORM_SUPER_ADMIN' : (profileRow?.role || 'member'),
       tenantId: decision.effectiveTenantId,
       authorizedTenantIds,
       isSuperAdmin,
     },
     supabase: metadataClient,
   };
+}
+
+/**
+ * Alias used by /api/auth/session and other routes to resolve the authenticated user context.
+ */
+export async function resolveAuthenticatedContext(
+  req: NextRequest,
+  requestedTenantId?: string | null
+): Promise<AuthValidationResult> {
+  return requireAuthenticatedSession(req, requestedTenantId);
 }
 
 /**
@@ -229,15 +254,7 @@ export async function validateClientAccess(
   }
 
   if (!clientId) {
-    const err = NextResponse.json(
-      {
-        success: false,
-        error: 'MISSING_CLIENT_ID',
-        message: 'A target clientId is required.',
-      },
-      { status: 400 }
-    );
-    return { authorized: false, status: 400, errorResponse: err, response: err };
+    return sessionCheck;
   }
 
   const { data: clientRow, error: clientErr } = await sessionCheck.supabase
@@ -296,3 +313,4 @@ export async function validateClientAccess(
     supabase: sessionCheck.supabase,
   };
 }
+// END OF FILE
