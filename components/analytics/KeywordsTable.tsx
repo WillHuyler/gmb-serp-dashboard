@@ -1,27 +1,53 @@
 'use client';
 
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { useClient } from '../../lib/client-context';
+
+interface KeywordRow {
+  id: string;
+  keyword: string;
+  google_rank: number;
+  maps_rank: number;
+  search_volume: number;
+  last_updated: string;
+  competitor_1?: string | null;
+  competitor_2?: string | null;
+  competitor_3?: string | null;
+}
 
 export default function KeywordsTable() {
   const { activeClient } = useClient();
+  const [keywords, setKeywords] = useState<KeywordRow[]>([]);
+  const [loading, setLoading] = useState<boolean>(false);
 
-  const clientKeywords: Record<
-    string,
-    Array<{ keyword: string; volume: string; rank: string; competitor: string }>
-  > = {
-    'a1b2c3d4-e5f6-7890-abcd-ef1234567890': [ // ABC Motors
-      { keyword: 'used cars near me', volume: '12,400', rank: '#2', competitor: 'Metro Auto Mall' },
-      { keyword: 'car dealership milwaukee', volume: '8,100', rank: '#3', competitor: 'Northside Ford' },
-      { keyword: 'auto repair service zip 53202', volume: '3,200', rank: '#1', competitor: 'FastLane Auto' },
-    ],
-    'bf93fef0-fc60-4119-8ea2-68a274984355': [ // High Rise Chimney
-      { keyword: 'chimney sweep near me', volume: '4,400', rank: '#1', competitor: 'Pocono Chimney Co' },
-      { keyword: 'fireplace repair stroudsburg', volume: '1,800', rank: '#1', competitor: 'Keystone Hearth' },
-    ],
-  };
+  useEffect(() => {
+    if (!activeClient?.id || !activeClient.is_certified) {
+      setKeywords([]);
+      return;
+    }
 
-  const keywords = activeClient?.id ? clientKeywords[activeClient.id] || [] : [];
+    let cancelled = false;
+    setLoading(true);
+    fetch(`/api/telemetry/client-data?clientId=${encodeURIComponent(activeClient.id)}`, {
+      cache: 'no-store',
+    })
+      .then((res) => res.json())
+      .then((data) => {
+        if (!cancelled) {
+          setKeywords(Array.isArray(data.keywords) ? data.keywords : []);
+        }
+      })
+      .catch(() => {
+        if (!cancelled) setKeywords([]);
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [activeClient?.id, activeClient?.is_certified]);
 
   return (
     <div className="bg-white border border-[#DCE5EF] rounded-xl p-5 space-y-4 shadow-sm">
@@ -31,14 +57,21 @@ export default function KeywordsTable() {
             TOP HIGH-VOLUME KEYWORDS & ROW-LEVEL COMPETITORS
           </span>
           <h3 className="text-xs font-bold text-[#0B1F3A]">
-            Rankings sorted by monthly search volume and localized competitive density for {activeClient?.name}
+            Live rankings sorted by monthly search volume for {activeClient?.name || 'Selected Client'}
           </h3>
         </div>
+        <span className="text-[10px] font-mono text-[#53657D]">
+          {keywords.length} Tracked Queries
+        </span>
       </div>
 
-      {keywords.length === 0 ? (
+      {loading ? (
+        <div className="p-6 text-center text-xs font-mono text-[#53657D] animate-pulse">
+          Querying certified keyword rankings...
+        </div>
+      ) : !activeClient?.is_certified || keywords.length === 0 ? (
         <div className="p-6 text-center text-xs font-mono text-[#53657D] bg-[#F4F7FB] rounded-lg border border-[#DCE5EF]">
-          NO KEYWORD METRICS MAPPED FOR {activeClient?.name?.toUpperCase() || 'SELECTED CLIENT'}
+          NO CERTIFIED KEYWORD METRICS MAPPED FOR {activeClient?.name?.toUpperCase() || 'SELECTED CLIENT'}
         </div>
       ) : (
         <div className="overflow-x-auto">
@@ -47,19 +80,39 @@ export default function KeywordsTable() {
               <tr className="border-b border-[#DCE5EF] text-slate-400 text-[10px] uppercase">
                 <th className="pb-2">KEYWORD</th>
                 <th className="pb-2">SEARCH VOLUME</th>
-                <th className="pb-2">RANK</th>
-                <th className="pb-2">TOP COMPETITOR</th>
+                <th className="pb-2">MAPS RANK</th>
+                <th className="pb-2">ORGANIC RANK</th>
+                <th className="pb-2">TOP COMPETITORS</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-[#DCE5EF]">
-              {keywords.map((kw, idx) => (
-                <tr key={idx} className="hover:bg-[#F4F7FB]">
-                  <td className="py-2.5 font-bold text-[#0B1F3A]">{kw.keyword}</td>
-                  <td className="py-2.5 text-[#53657D]">{kw.volume}</td>
-                  <td className="py-2.5 text-[#12A36D] font-bold">{kw.rank}</td>
-                  <td className="py-2.5 text-[#53657D]">{kw.competitor}</td>
-                </tr>
-              ))}
+              {keywords.map((kw) => {
+                const competitors = [kw.competitor_1, kw.competitor_2, kw.competitor_3].filter(
+                  Boolean
+                );
+                return (
+                  <tr key={kw.id} className="hover:bg-[#F4F7FB]">
+                    <td className="py-2.5 font-bold text-[#0B1F3A]">{kw.keyword}</td>
+                    <td className="py-2.5 text-[#53657D]">
+                      {Number(kw.search_volume || 0).toLocaleString()}/mo
+                    </td>
+                    <td className="py-2.5 text-[#12A36D] font-bold">#{kw.maps_rank}</td>
+                    <td className="py-2.5 text-[#0B1F3A] font-bold">#{kw.google_rank}</td>
+                    <td className="py-2.5 text-[#53657D]">
+                      <div className="flex flex-wrap gap-1">
+                        {competitors.map((comp, i) => (
+                          <span
+                            key={i}
+                            className="bg-[#F4F7FB] border border-[#DCE5EF] px-2 py-0.5 rounded text-[10px] text-[#0B1F3A]"
+                          >
+                            {comp}
+                          </span>
+                        ))}
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </div>
