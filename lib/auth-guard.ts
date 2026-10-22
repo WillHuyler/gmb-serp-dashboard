@@ -46,7 +46,8 @@ export function extractAccessToken(req: NextRequest): string | null {
   return null;
 }
 
-export function getServerSupabaseClient(token?: string | null): SupabaseClient {
+export function getServerSupabaseClient(reqOrToken?: NextRequest | string | null): SupabaseClient {
+  const token = typeof reqOrToken === 'string' ? reqOrToken : (reqOrToken ? extractAccessToken(reqOrToken) : null);
   const u = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
   const k = token ? (process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '') : (process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '');
   const o: any = { auth: { persistSession: false, autoRefreshToken: false } };
