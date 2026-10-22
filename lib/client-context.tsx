@@ -30,6 +30,8 @@ export interface ClientMappings {
   [key: string]: string | undefined;
 }
 
+export type ClientProfileMappings = ClientMappings;
+
 export interface ClientProfile {
   id: string;
   tenant_id: string;
@@ -46,7 +48,7 @@ export interface ClientProfile {
 
 export type Client = ClientProfile;
 
-// Exact 1:1 mirror of live Supabase public.clients table (9 verified records)
+// Exact 1:1 mirror of the 9 verified client rows in Supabase public.clients
 export const AUTHORITATIVE_CLIENT_REGISTRY: ClientProfile[] = [
   {
     id: '98b58332-a79d-47ac-b771-96ecce1f04fc',
@@ -56,13 +58,17 @@ export const AUTHORITATIVE_CLIENT_REGISTRY: ClientProfile[] = [
     address: 'Delavan, WI, USA',
     domain: 'highrisechimney.com',
     is_certified: true,
-    data_certification_status: 'CERTIFIED',
+    data_certification_status: 'DATA_REVIEW_REQUIRED',
     type: 'REAL',
     service_areas: ['53092', '53097', '53202', '53211', '53217'],
     mappings: {
+      gmb_account_id: '1003001',
       gmb_location_id: '1003001',
-      brightlocal_location_id: 'bl_highrise_53202',
+      google_ads_id: 'ads_highrise_53202',
+      ga4_property_id: 'ga4_highrise_53202',
       gsc_site_url: 'https://highrisechimney.com',
+      meta_act_id: 'act_highrise_53202',
+      brightlocal_location_id: 'bl_highrise_53202',
     },
   },
   {
@@ -75,7 +81,7 @@ export const AUTHORITATIVE_CLIENT_REGISTRY: ClientProfile[] = [
     is_certified: false,
     data_certification_status: 'DATA_REVIEW_REQUIRED',
     type: 'REAL',
-    service_areas: ['18360', '18301'],
+    service_areas: ['18360'],
     mappings: {
       gmb_location_id: '9478581082636497192',
     },
@@ -146,3 +152,148 @@ export const AUTHORITATIVE_CLIENT_REGISTRY: ClientProfile[] = [
     name: 'BROTHERS-IN-BUSINESS FLOORING LLC',
     store_code: '06832735424770532428',
     address: '506 E College St, Suite B, Dickson, TN 37055',
+    domain: null,
+    is_certified: false,
+    data_certification_status: 'DATA_REVIEW_REQUIRED',
+    type: 'REAL',
+    service_areas: ['37055'],
+    mappings: {
+      gmb_location_id: '06832735424770532428',
+    },
+  },
+  {
+    id: '22a8990a-608b-428b-97a6-2e6dd86dd13b',
+    tenant_id: '00000000-0000-0000-0000-000000000001',
+    name: 'Brothers-in-Business LLC',
+    store_code: null,
+    address: '301 S. Main St., Ste. A, Dickson, TN 37055',
+    domain: null,
+    is_certified: false,
+    data_certification_status: 'DATA_REVIEW_REQUIRED',
+    type: 'REAL',
+    service_areas: ['37055'],
+    mappings: {},
+  },
+  {
+    id: 'a1b2c3d4-e5f6-7890-abcd-ef1234567890',
+    tenant_id: '00000000-0000-0000-0000-000000000001',
+    name: 'ABC Motors',
+    store_code: null,
+    address: null,
+    domain: 'abcmotors.com',
+    is_certified: false,
+    data_certification_status: 'DATA_REVIEW_REQUIRED',
+    type: 'TEST',
+    service_areas: [],
+    mappings: {},
+  },
+];
+
+export const CANONICAL_CLIENTS = AUTHORITATIVE_CLIENT_REGISTRY;
+
+interface ClientContextType {
+  activeClient: ClientProfile | null;
+  availableClients: ClientProfile[];
+  clients: ClientProfile[];
+  clientRegistry: ClientProfile[];
+  setActiveClient: (client: ClientProfile) => void;
+  setActiveClientId: (id: string) => void;
+  addClient: (newClient: ClientProfile) => void;
+  refreshClients: () => Promise<void>;
+  isLoading: boolean;
+}
+
+const ClientContext = createContext<ClientContextType | undefined>(undefined);
+
+export function ClientProvider({ children }: { children: ReactNode }) {
+  const [clientList, setClientList] = useState<ClientProfile[]>(AUTHORITATIVE_CLIENT_REGISTRY);
+  const [activeClient, setActiveClientState] = useState<ClientProfile | null>(AUTHORITATIVE_CLIENT_REGISTRY[0]);
+  const [isLoading, setIsLoading] = useState<boolean>(false);
+
+  const refreshClients = async () => {
+    try {
+      const res = await fetch('/api/clients', { cache: 'no-store' });
+      if (!res.ok) return;
+      const data = await res.json();
+      if (data.success && Array.isArray(data.clients) && data.clients.length > 0) {
+        setClientList(data.clients);
+        const urlParams = typeof window !== 'undefined' ? new URLSearchParams(window.location.search) : null;
+        const urlClientId = urlParams?.get('clientId');
+        const savedId = typeof window !== 'undefined' ? localStorage.getItem('porchlight_active_client_id') : null;
+        const targetId = urlClientId || savedId || activeClient?.id;
+
+        const nextActive =
+          data.clients.find((c: ClientProfile) => c.id === targetId) ||
+          data.clients[0];
+
+        if (nextActive) {
+          setActiveClientState(nextActive);
+        }
+      }
+    } catch (err) {
+      console.warn('Using canonical client registry fallback:', err);
+    }
+  };
+
+  useEffect(() => {
+    const urlParams = typeof window !== 'undefined' ? new URLSearchParams(window.location.search) : null;
+    const urlClientId = urlParams?.get('clientId');
+    const savedClientId = typeof window !== 'undefined' ? localStorage.getItem('porchlight_active_client_id') : null;
+    const initialId = urlClientId || savedClientId;
+
+    if (initialId) {
+      const match = clientList.find((c) => c.id === initialId);
+      if (match) {
+        setActiveClientState(match);
+      }
+    }
+    refreshClients();
+  }, []);
+
+  const setActiveClient = (client: ClientProfile) => {
+    setIsLoading(true);
+    setActiveClientState(client);
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('porchlight_active_client_id', client.id);
+    }
+    setTimeout(() => setIsLoading(false), 150);
+  };
+
+  const setActiveClientId = (id: string) => {
+    const match = clientList.find((c) => c.id === id);
+    if (match) {
+      setActiveClient(match);
+    }
+  };
+
+  const addClient = (newClient: ClientProfile) => {
+    setClientList((prev) => [...prev, newClient]);
+    setActiveClient(newClient);
+  };
+
+  return (
+    <ClientContext.Provider
+      value={{
+        activeClient,
+        availableClients: clientList,
+        clients: clientList,
+        clientRegistry: clientList,
+        setActiveClient,
+        setActiveClientId,
+        addClient,
+        refreshClients,
+        isLoading,
+      }}
+    >
+      {children}
+    </ClientContext.Provider>
+  );
+}
+
+export function useClient() {
+  const context = useContext(ClientContext);
+  if (!context) {
+    throw new Error('useClient must be used within a ClientProvider');
+  }
+  return context;
+}
