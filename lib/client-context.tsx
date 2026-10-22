@@ -1,6 +1,7 @@
 'use client';
 
-import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback, ReactNode } from 'react';
+import type { DataCertificationState } from './data-certification';
 
 export type ProviderMappingKey =
   | 'gmb_account_id'
@@ -46,6 +47,11 @@ export interface ClientProfile {
   currency?: string | null;
   status?: 'active' | 'onboarding' | 'inactive' | string;
   is_certified: boolean;
+  certification_state?: DataCertificationState;
+  has_historical_data?: boolean;
+  latest_metric_date?: string | null;
+  staleness_days?: number | null;
+  provenance_reason?: string;
   data_certification_status?: string;
   type?: 'REAL' | 'TEST';
   mapped_accounts_count?: number;
@@ -55,89 +61,126 @@ export interface ClientProfile {
   organization_id?: string | null;
   service_areas: string[];
   mappings: ClientMappings;
-  [key: string]: any;
 }
 
 export type Client = ClientProfile;
 
-const T_ID = '00000000-0000-0000-0000-000000000001';
-
-export const AUTHORITATIVE_CLIENT_REGISTRY: ClientProfile[] = [
-  { id: '98b58332-a79d-47ac-b771-96ecce1f04fc', tenant_id: T_ID, name: 'High Rise Chimney Sweep & Service', store_code: '1003001', address: 'Delavan, WI, USA', domain: 'highrisechimney.com', timezone: 'America/Chicago', currency: 'USD', status: 'active', is_certified: true, data_certification_status: 'DATA_REVIEW_REQUIRED', type: 'REAL', service_areas: ['53092', '53097', '53202', '53211', '53217'], mappings: { gmb_account_id: '1003001', gmb_location_id: '1003001', google_ads_id: 'ads_highrise_53202', ga4_property_id: 'ga4_highrise_53202', gsc_site_url: 'https://highrisechimney.com', meta_act_id: 'act_highrise_53202', brightlocal_location_id: 'bl_highrise_53202' } },
-  { id: 'db2c2c46-d16b-48bd-9bf9-d530e61ca2b4', tenant_id: T_ID, name: 'Kelly Hyundai of Stroudsburg', store_code: '9478581082636497192', address: '1534 N 9th St, Stroudsburg, PA 18360', domain: 'kellyhyundai.com', timezone: 'America/New_York', currency: 'USD', status: 'onboarding', is_certified: false, data_certification_status: 'DATA_REVIEW_REQUIRED', type: 'REAL', service_areas: ['18360'], mappings: { gmb_location_id: '9478581082636497192' } },
-  { id: 'bf93fef0-fc60-4119-8ea2-68a274984355', tenant_id: T_ID, name: 'Kelly Hyundai of Stroudsburg Service and Parts', store_code: '06510819750374635156', address: '1534 N 9th St, Stroudsburg, PA 18360', domain: 'kellyhyundai.com', timezone: 'America/New_York', currency: 'USD', status: 'onboarding', is_certified: false, data_certification_status: 'DATA_REVIEW_REQUIRED', type: 'REAL', service_areas: ['18360'], mappings: { gmb_location_id: '06510819750374635156' } },
-  { id: '8bdf10e5-3198-45d1-8baa-66deba9b2279', tenant_id: T_ID, name: 'CarBahn Service', store_code: '1318998720183880132', address: '1965 Kyle Park Ct, San Jose, CA 95125', domain: null, timezone: 'America/Los_Angeles', currency: 'USD', status: 'onboarding', is_certified: false, data_certification_status: 'DATA_REVIEW_REQUIRED', type: 'REAL', service_areas: ['95125'], mappings: { gmb_location_id: '1318998720183880132' } },
-  { id: 'a0e05742-c348-423c-94c4-3b3eec663a35', tenant_id: T_ID, name: 'Koon Cook & Walters', store_code: '2613472_1', address: '2016 Gadsden St., Columbia, SC 29201', domain: null, timezone: 'America/New_York', currency: 'USD', status: 'onboarding', is_certified: false, data_certification_status: 'DATA_REVIEW_REQUIRED', type: 'REAL', service_areas: ['29201'], mappings: { gmb_location_id: '2613472_1' } },
-  { id: 'ebfd7627-b940-4790-85f0-ecbc9fb40947', tenant_id: T_ID, name: 'Sicardo Towing', store_code: '06814199601923124542', address: '11 Hamburg Turnpike, Riverdale, NJ 07457', domain: null, timezone: 'America/New_York', currency: 'USD', status: 'onboarding', is_certified: false, data_certification_status: 'DATA_REVIEW_REQUIRED', type: 'REAL', service_areas: ['07457'], mappings: { gmb_location_id: '06814199601923124542' } },
-  { id: '93a113cc-2e20-490b-bcd5-974f90189f50', tenant_id: T_ID, name: 'BROTHERS-IN-BUSINESS FLOORING LLC', store_code: '06832735424770532428', address: '506 E College St, Suite B, Dickson, TN 37055', domain: null, timezone: 'America/Chicago', currency: 'USD', status: 'onboarding', is_certified: false, data_certification_status: 'DATA_REVIEW_REQUIRED', type: 'REAL', service_areas: ['37055'], mappings: { gmb_location_id: '06832735424770532428' } },
-  { id: '22a8990a-608b-428b-97a6-2e6dd86dd13b', tenant_id: T_ID, name: 'Brothers-in-Business LLC', store_code: null, address: '301 S. Main St., Ste. A, Dickson, TN 37055', domain: null, timezone: 'America/Chicago', currency: 'USD', status: 'onboarding', is_certified: false, data_certification_status: 'DATA_REVIEW_REQUIRED', type: 'REAL', service_areas: ['37055'], mappings: {} },
-  { id: 'a1b2c3d4-e5f6-7890-abcd-ef1234567890', tenant_id: T_ID, name: 'ABC Motors', store_code: null, address: null, domain: 'abcmotors.com', timezone: 'America/New_York', currency: 'USD', status: 'onboarding', is_certified: false, data_certification_status: 'DATA_REVIEW_REQUIRED', type: 'TEST', service_areas: [], mappings: {} },
-];
-
-export const CANONICAL_CLIENTS = AUTHORITATIVE_CLIENT_REGISTRY;
+// CR-011 Requirement 8: Production client registry fallback removed.
+// Exported as empty arrays strictly for backwards-compatible import signatures.
+export const AUTHORITATIVE_CLIENT_REGISTRY: ClientProfile[] = [];
+export const CANONICAL_CLIENTS: ClientProfile[] = [];
 
 interface ClientContextType {
   activeClient: ClientProfile | null;
   availableClients: ClientProfile[];
   clients: ClientProfile[];
   clientRegistry: ClientProfile[];
-  setActiveClient: (client: ClientProfile) => void;
+  setActiveClient: (client: ClientProfile | null) => void;
   setActiveClientId: (id: string) => void;
   addClient: (newClient: ClientProfile) => void;
   refreshClients: () => Promise<void>;
   isLoading: boolean;
+  authStatus: 'loading' | 'authenticated' | 'unauthenticated' | 'forbidden' | 'error';
   error: string | null;
 }
 
 const ClientContext = createContext<ClientContextType | undefined>(undefined);
 
 export function ClientProvider({ children }: { children: ReactNode }) {
-  const [clientList, setClientList] = useState<ClientProfile[]>(AUTHORITATIVE_CLIENT_REGISTRY);
-  const [activeClient, setActiveClientState] = useState<ClientProfile | null>(AUTHORITATIVE_CLIENT_REGISTRY[0]);
-  const [isLoading, setIsLoading] = useState<boolean>(false);
+  const [clientList, setClientList] = useState<ClientProfile[]>([]);
+  const [activeClient, setActiveClientState] = useState<ClientProfile | null>(null);
+  const [isLoading, setIsLoading] = useState<boolean>(true);
+  const [authStatus, setAuthStatus] = useState<
+    'loading' | 'authenticated' | 'unauthenticated' | 'forbidden' | 'error'
+  >('loading');
   const [error, setError] = useState<string | null>(null);
 
-  const refreshClients = async () => {
+  const refreshClients = useCallback(async () => {
+    setIsLoading(true);
+    setError(null);
     try {
-      setError(null);
-      const res = await fetch('/api/clients', { cache: 'no-store' });
-      if (!res.ok) return;
-      const data = await res.json();
-      if (data.success && Array.isArray(data.clients) && data.clients.length > 0) {
-        setClientList(data.clients);
-        const urlParams = typeof window !== 'undefined' ? new URLSearchParams(window.location.search) : null;
-        const urlClientId = urlParams?.get('clientId');
-        const savedId = typeof window !== 'undefined' ? localStorage.getItem('porchlight_active_client_id') : null;
-        const targetId = urlClientId || savedId || activeClient?.id;
-        const nextActive = data.clients.find((c: ClientProfile) => c.id === targetId) || data.clients[0];
-        if (nextActive) setActiveClientState(nextActive);
-      }
-    } catch (err: any) {
-      setError(err?.message || null);
-      console.warn('Using canonical client registry fallback:', err);
-    }
-  };
+      const res = await fetch('/api/clients', {
+        cache: 'no-store',
+        credentials: 'include',
+      });
 
-  useEffect(() => {
-    const urlParams = typeof window !== 'undefined' ? new URLSearchParams(window.location.search) : null;
-    const initialId = urlParams?.get('clientId') || (typeof window !== 'undefined' ? localStorage.getItem('porchlight_active_client_id') : null);
-    if (initialId) {
-      const match = clientList.find((c) => c.id === initialId);
-      if (match) setActiveClientState(match);
+      if (res.status === 401) {
+        setClientList([]);
+        setActiveClientState(null);
+        setAuthStatus('unauthenticated');
+        setError('Authentication required (401). Please sign in to access client records.');
+        return;
+      }
+
+      if (res.status === 403) {
+        setClientList([]);
+        setActiveClientState(null);
+        setAuthStatus('forbidden');
+        setError('Access forbidden (403). Your account is not authorized for this tenant.');
+        return;
+      }
+
+      if (!res.ok) {
+        const errPayload = await res.json().catch(() => ({}));
+        setClientList([]);
+        setActiveClientState(null);
+        setAuthStatus('error');
+        setError(errPayload.message || `Failed to load clients (HTTP ${res.status}).`);
+        return;
+      }
+
+      const data = await res.json();
+      const loadedClients: ClientProfile[] = Array.isArray(data.clients) ? data.clients : [];
+      setClientList(loadedClients);
+      setAuthStatus('authenticated');
+
+      if (loadedClients.length === 0) {
+        setActiveClientState(null);
+        return;
+      }
+
+      const urlParams =
+        typeof window !== 'undefined' ? new URLSearchParams(window.location.search) : null;
+      const urlClientId = urlParams?.get('clientId');
+      const savedId =
+        typeof window !== 'undefined'
+          ? localStorage.getItem('porchlight_active_client_id')
+          : null;
+
+      const targetId = urlClientId || savedId;
+      const matched = loadedClients.find((c) => c.id === targetId) || loadedClients[0];
+      setActiveClientState(matched);
+    } catch (err: any) {
+      setClientList([]);
+      setActiveClientState(null);
+      setAuthStatus('error');
+      setError(err?.message || 'Network error while loading authorized clients.');
+    } finally {
+      setIsLoading(false);
     }
-    refreshClients();
   }, []);
 
-  const setActiveClient = (client: ClientProfile) => {
+  useEffect(() => {
+    refreshClients();
+  }, [refreshClients]);
+
+  const setActiveClient = (client: ClientProfile | null) => {
     setIsLoading(true);
+    // Atomically clear previous client state before setting next client
     setActiveClientState(client);
-    if (typeof window !== 'undefined') localStorage.setItem('porchlight_active_client_id', client.id);
-    setTimeout(() => setIsLoading(false), 150);
+    if (typeof window !== 'undefined') {
+      if (client) {
+        localStorage.setItem('porchlight_active_client_id', client.id);
+      } else {
+        localStorage.removeItem('porchlight_active_client_id');
+      }
+    }
+    setTimeout(() => setIsLoading(false), 50);
   };
 
   const setActiveClientId = (id: string) => {
-    const match = clientList.find((c) => c.id === id);
-    if (match) setActiveClient(match);
+    const match = clientList.find((c) => c.id === id) || null;
+    setActiveClient(match);
   };
 
   const addClient = (newClient: ClientProfile) => {
@@ -157,6 +200,7 @@ export function ClientProvider({ children }: { children: ReactNode }) {
         addClient,
         refreshClients,
         isLoading,
+        authStatus,
         error,
       }}
     >
@@ -170,4 +214,3 @@ export function useClient() {
   if (!context) throw new Error('useClient must be used within a ClientProvider');
   return context;
 }
-// END OF FILE
