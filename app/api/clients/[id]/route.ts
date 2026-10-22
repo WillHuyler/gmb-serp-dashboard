@@ -1,65 +1,92 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@supabase/supabase-js';
-import { AUTHORITATIVE_CLIENT_REGISTRY, ClientProfile } from '../../../../lib/client-context';
+import { validateClientAccess } from '../../../../lib/auth-guard';
+import { evaluateClientDataProvenance } from '../../../../lib/data-certification';
+import type { ClientProfile } from '../../../../lib/client-context';
 
 export const dynamic = 'force-dynamic';
-
-function getSupabase() {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
-  const key =
-    process.env.SUPABASE_SERVICE_ROLE_KEY ||
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ||
-    '';
-  if (!url || !key) return null;
-  return createClient(url, key);
-}
 
 export async function GET(
   req: NextRequest,
   { params }: { params: { id: string } }
 ) {
   const clientId = params.id;
-  const supabase = getSupabase();
-
-  if (!supabase) {
-    const fallback = AUTHORITATIVE_CLIENT_REGISTRY.find((c) => c.id === clientId);
-    if (!fallback) {
-      return NextResponse.json({ success: false, error: 'CLIENT_NOT_FOUND' }, { status: 404 });
-    }
-    return NextResponse.json({ success: true, client: fallback });
+  const auth = await validateClientAccess(req, clientId);
+  if (!auth.authorized || !auth.supabase || !auth.context) {
+    return auth.errorResponse!;
   }
 
   try {
-    const { data: row, error } = await supabase
-      .from('clients')
-      .select('id, name, store_code, address, domain, tenant_id, is_certified, data_certification_status')
-      .eq('id', clientId)
-      .single();
+    const [
+      { data: row, error: rowErr },
+      { data: mappings, error: mapErr },
+      { data: conns, error: connErr },
+      { data: dmRows, error: dmErr },
+    ] = await Promise.all([
+      auth.supabase
+        .from('clients')
+        .select(
+          'id, name, store_code, address, domain, tenant_id, is_certified, data_certification_status'
+        )
+        .eq('id', clientId)
+        .single(),
+      auth.supabase
+        .from('account_mappings')
+        .select('id, provider, external_account_id')
+        .eq('client_id', clientId),
+      auth.supabase
+        .from('provider_connections')
+        .select('id, status')
+        .eq('tenant_id', auth.context.tenantId),
+      auth.supabase
+        .from('daily_metrics')
+        .select('metric_date')
+        .eq('client_id', clientId)
+        .order('metric_date', { ascending: false })
+        .limit(1),
+    ]);
 
-    if (error || !row) {
-      const fallback = AUTHORITATIVE_CLIENT_REGISTRY.find((c) => c.id === clientId);
-      if (fallback) {
-        return NextResponse.json({ success: true, client: fallback });
-      }
-      return NextResponse.json({ success: false, error: 'CLIENT_NOT_FOUND' }, { status: 404 });
+    if (rowErr || !row || mapErr || connErr || dmErr) {
+      return NextResponse.json(
+        { success: false, error: 'CLIENT_QUERY_FAILED' },
+        { status: 500 }
+      );
     }
 
-    const match = AUTHORITATIVE_CLIENT_REGISTRY.find((c) => c.id === row.id);
-    const isCertified = Boolean(row.is_certified);
+    const activeConns = (conns || []).filter(
+      (c: any) => c.status === 'ACTIVE' || c.status === 'CONNECTED' || c.status === 'HEALTHY'
+    ).length;
+
+    const latestDate = dmRows?.[0]?.metric_date || null;
+    const provenance = evaluateClientDataProvenance({
+      dbIsCertifiedFlag: Boolean(row.is_certified),
+      mappedAccountsCount: (mappings || []).length,
+      verifiedConnectionsCount: activeConns,
+      dailyMetricsCount: (dmRows || []).length,
+      platformMetricsCount: 0,
+      keywordRowsCount: 0,
+      latestMetricDate: latestDate,
+    });
 
     const clientProfile: ClientProfile = {
       id: row.id,
-      tenant_id: row.tenant_id || '00000000-0000-0000-0000-000000000001',
-      name: row.name || 'Unnamed Client',
+      tenant_id: row.tenant_id,
+      name: row.name,
       store_code: row.store_code || null,
       address: row.address || null,
-      domain: row.domain || match?.domain || null,
-      status: isCertified ? 'active' : 'onboarding',
-      is_certified: isCertified,
+      domain: row.domain || null,
+      timezone: 'America/New_York',
+      currency: 'USD',
+      status: provenance.isCertified ? 'active' : 'onboarding',
+      is_certified: provenance.isCertified,
+      certification_state: provenance.certificationState,
+      has_historical_data: provenance.hasHistoricalData,
+      latest_metric_date: provenance.latestMetricDate,
+      staleness_days: provenance.stalenessDays,
+      provenance_reason: provenance.reason,
       data_certification_status: row.data_certification_status || 'DATA_REVIEW_REQUIRED',
       type: row.name === 'ABC Motors' ? 'TEST' : 'REAL',
-      service_areas: match?.service_areas || [],
-      mappings: match?.mappings || (row.store_code ? { gmb_location_id: row.store_code } : {}),
+      service_areas: [],
+      mappings: {},
     };
 
     return NextResponse.json({
@@ -79,13 +106,9 @@ export async function PATCH(
   { params }: { params: { id: string } }
 ) {
   const clientId = params.id;
-  const supabase = getSupabase();
-
-  if (!supabase) {
-    return NextResponse.json(
-      { success: false, error: 'SUPABASE_NOT_CONFIGURED' },
-      { status: 503 }
-    );
+  const auth = await validateClientAccess(req, clientId);
+  if (!auth.authorized || !auth.supabase) {
+    return auth.errorResponse!;
   }
 
   try {
@@ -96,9 +119,9 @@ export async function PATCH(
     if (body.address !== undefined) updates.address = body.address;
     if (body.domain !== undefined) updates.domain = body.domain;
     if (body.store_code !== undefined) updates.store_code = body.store_code;
-    if (typeof body.is_certified === 'boolean') updates.is_certified = body.is_certified;
+    // CR-012: Prevent arbitrary client-side flipping of is_certified without verified mappings
 
-    const { data, error } = await supabase
+    const { data, error } = await auth.supabase
       .from('clients')
       .update(updates)
       .eq('id', clientId)
