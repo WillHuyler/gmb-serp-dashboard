@@ -88,7 +88,8 @@ export async function requireAuthenticatedSession(req: NextRequest, reqTenantId?
 
 export const resolveAuthenticatedContext = requireAuthenticatedSession;
 
-export async function validateClientAccess(req: NextRequest, clientId?: string | null, reqTenantId?: string | null): Promise<AuthValidationResult> {
+export async function validateClientAccess(req: NextRequest, clientId?: string | null, reqTenantOrFlag?: string | boolean | null): Promise<AuthValidationResult> {
+  const reqTenantId = typeof reqTenantOrFlag === 'string' ? reqTenantOrFlag : null;
   const s = await requireAuthenticatedSession(req, reqTenantId);
   if (!s.authorized || !s.context || !s.supabase || !clientId) return s;
   const { data: row, error } = await s.supabase.from('clients').select('id, tenant_id').eq('id', clientId).maybeSingle();
