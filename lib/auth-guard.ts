@@ -15,6 +15,7 @@ export interface AuthSessionContext {
   role?: string;
   tenantId: string;
   authorizedTenantIds: string[];
+  authorizedClientIds: string[];
   isSuperAdmin: boolean;
 }
 
@@ -59,10 +60,6 @@ export function extractAccessToken(req: NextRequest): string | null {
   return null;
 }
 
-/**
- * Creates a Supabase client for server-side operations AFTER authentication is verified,
- * or scoped to a specific user access token when provided.
- */
 export function getServerSupabaseClient(accessToken?: string | null): SupabaseClient {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
   const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || '';
@@ -105,9 +102,6 @@ function createInternalMetadataVerifier(): SupabaseClient | null {
   });
 }
 
-/**
- * CR-011: Require a valid Supabase Auth session before accessing private records.
- */
 export async function requireAuthenticatedSession(
   req: NextRequest,
   requestedTenantId?: string | null
@@ -210,107 +204,4 @@ export async function requireAuthenticatedSession(
     return {
       authorized: false,
       status: decision.status,
-      errorResponse: err,
-      response: err,
-    };
-  }
-
-  return {
-    authorized: true,
-    status: 200,
-    context: {
-      userId: user.id,
-      email: user.email,
-      role: isSuperAdmin ? 'PLATFORM_SUPER_ADMIN' : (profileRow?.role || 'member'),
-      tenantId: decision.effectiveTenantId,
-      authorizedTenantIds,
-      isSuperAdmin,
-    },
-    supabase: metadataClient,
-  };
-}
-
-/**
- * Alias used by /api/auth/session and other routes to resolve the authenticated user context.
- */
-export async function resolveAuthenticatedContext(
-  req: NextRequest,
-  requestedTenantId?: string | null
-): Promise<AuthValidationResult> {
-  return requireAuthenticatedSession(req, requestedTenantId);
-}
-
-/**
- * Validates that the caller is authenticated AND authorized to access the specific clientId.
- */
-export async function validateClientAccess(
-  req: NextRequest,
-  clientId?: string | null,
-  requestedTenantId?: string | null
-): Promise<AuthValidationResult> {
-  const sessionCheck = await requireAuthenticatedSession(req, requestedTenantId);
-  if (!sessionCheck.authorized || !sessionCheck.context || !sessionCheck.supabase) {
-    return sessionCheck;
-  }
-
-  if (!clientId) {
-    return sessionCheck;
-  }
-
-  const { data: clientRow, error: clientErr } = await sessionCheck.supabase
-    .from('clients')
-    .select('id, tenant_id')
-    .eq('id', clientId)
-    .maybeSingle();
-
-  if (clientErr) {
-    const err = NextResponse.json(
-      {
-        success: false,
-        error: 'CLIENT_LOOKUP_FAILED',
-        message: 'Failed to verify client ownership.',
-      },
-      { status: 500 }
-    );
-    return { authorized: false, status: 500, errorResponse: err, response: err };
-  }
-
-  const decision = evaluateClientAccessPolicy(
-    {
-      userId: sessionCheck.context.userId,
-      email: sessionCheck.context.email,
-      isSuperAdmin: sessionCheck.context.isSuperAdmin,
-      authorizedTenantIds: sessionCheck.context.authorizedTenantIds,
-    },
-    clientRow,
-    requestedTenantId
-  );
-
-  if (!decision.allowed) {
-    const err = NextResponse.json(
-      {
-        success: false,
-        error: decision.code,
-        message: decision.message,
-      },
-      { status: decision.status }
-    );
-    return {
-      authorized: false,
-      status: decision.status,
-      errorResponse: err,
-      response: err,
-    };
-  }
-
-  return {
-    authorized: true,
-    status: 200,
-    context: {
-      ...sessionCheck.context,
-      tenantId: decision.effectiveTenantId,
-    },
-    supabase: sessionCheck.supabase,
-  };
-}
-// END OF FILE
+      error
