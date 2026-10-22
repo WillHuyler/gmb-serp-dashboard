@@ -5,6 +5,71 @@ export type DataCertificationState =
   | 'MAPPED_PENDING_SYNC'
   | 'UNMAPPED';
 
+export interface AccountMappingRecord {
+  id: string;
+  tenant_id: string;
+  client_id: string;
+  external_account_id: string;
+  mapping_role?: string | null;
+  mapping_confidence?: number | null;
+  is_confirmed?: boolean | null;
+  include_in_command_center?: boolean | null;
+  created_at?: string;
+}
+
+export interface ExternalAccountRecord {
+  id: string;
+  tenant_id: string;
+  connection_id?: string | null;
+  provider: string;
+  external_account_id: string;
+  descriptive_name?: string | null;
+  status?: string | null;
+}
+
+export interface ResolvedClientMapping {
+  mappingId: string;
+  clientId: string;
+  tenantId: string;
+  externalAccountId: string;
+  provider: string;
+  descriptiveName: string | null;
+  isConfirmed: boolean;
+}
+
+export function resolveConfirmedClientMappings(
+  clientId: string,
+  tenantId: string,
+  mappings: AccountMappingRecord[],
+  externalAccounts: ExternalAccountRecord[]
+): ResolvedClientMapping[] {
+  const clientMaps = (mappings || []).filter(
+    (m) => m.client_id === clientId && m.tenant_id === tenantId && m.is_confirmed === true
+  );
+  const tenantAccounts = (externalAccounts || []).filter(
+    (ea) => ea.tenant_id === tenantId && (!ea.status || ea.status === 'ACTIVE')
+  );
+
+  const resolved: ResolvedClientMapping[] = [];
+  for (const m of clientMaps) {
+    const ea = tenantAccounts.find(
+      (a) => a.id === m.external_account_id || a.external_account_id === m.external_account_id
+    );
+    if (ea && ea.provider) {
+      resolved.push({
+        mappingId: m.id,
+        clientId,
+        tenantId,
+        externalAccountId: ea.external_account_id,
+        provider: ea.provider.toUpperCase(),
+        descriptiveName: ea.descriptive_name || null,
+        isConfirmed: true,
+      });
+    }
+  }
+  return resolved;
+}
+
 export interface ProvenanceEvaluationInput {
   dbIsCertifiedFlag: boolean;
   mappedAccountsCount: number;
@@ -27,34 +92,22 @@ export interface ProvenanceEvaluationResult {
   reason: string;
 }
 
-/**
- * CR-012: Strictly separates historical database records from verified live synchronization.
- * Never marks a client certified merely because `clients.is_certified = true` or rows exist.
- */
-export function evaluateClientDataProvenance(
-  input: ProvenanceEvaluationInput
-): ProvenanceEvaluationResult {
+export function evaluateClientDataProvenance(input: ProvenanceEvaluationInput): ProvenanceEvaluationResult {
   const now = input.referenceDate || new Date();
-  const maxFreshDays = input.freshnessThresholdDays ?? 7;
-
-  const totalMetricRows =
-    input.dailyMetricsCount + input.platformMetricsCount + input.keywordRowsCount;
-  const hasHistoricalData = totalMetricRows > 0;
+  const maxDays = input.freshnessThresholdDays ?? 7;
+  const hasHistoricalData = (input.dailyMetricsCount + input.platformMetricsCount + input.keywordRowsCount) > 0;
 
   let stalenessDays: number | null = null;
   if (input.latestMetricDate) {
     const parsed = new Date(input.latestMetricDate);
     if (!Number.isNaN(parsed.getTime())) {
-      const diffMs = now.getTime() - parsed.getTime();
-      stalenessDays = Math.max(0, Math.floor(diffMs / (1000 * 60 * 60 * 24)));
+      stalenessDays = Math.max(0, Math.floor((now.getTime() - parsed.getTime()) / 86400000));
     }
   }
 
-  const isFresh = stalenessDays !== null && stalenessDays <= maxFreshDays;
-  const hasVerifiedMapping =
-    input.mappedAccountsCount > 0 && input.verifiedConnectionsCount > 0;
+  const isFresh = stalenessDays !== null && stalenessDays <= maxDays;
+  const hasVerifiedMapping = input.mappedAccountsCount > 0 && input.verifiedConnectionsCount > 0;
 
-  // Case 1: No provider mappings exist in account_mappings
   if (input.mappedAccountsCount === 0) {
     if (hasHistoricalData) {
       return {
@@ -64,12 +117,9 @@ export function evaluateClientDataProvenance(
         hasHistoricalData: true,
         latestMetricDate: input.latestMetricDate,
         stalenessDays,
-        reason: `Historical records exist (latest: ${
-          input.latestMetricDate || 'unknown'
-        }), but 0 active provider mappings or live connections are configured.`,
+        reason: `Historical records present (latest: ${input.latestMetricDate || 'unknown'}), but 0 confirmed provider mappings exist.`,
       };
     }
-
     return {
       certificationState: 'UNMAPPED',
       isCertified: false,
@@ -77,11 +127,10 @@ export function evaluateClientDataProvenance(
       hasHistoricalData: false,
       latestMetricDate: null,
       stalenessDays: null,
-      reason: 'No provider accounts mapped and no telemetry records present.',
+      reason: 'No confirmed provider accounts mapped and no telemetry records present.',
     };
   }
 
-  // Case 2: Mappings exist, but no telemetry has been ingested yet
   if (!hasHistoricalData) {
     return {
       certificationState: 'MAPPED_PENDING_SYNC',
@@ -90,11 +139,10 @@ export function evaluateClientDataProvenance(
       hasHistoricalData: false,
       latestMetricDate: null,
       stalenessDays: null,
-      reason: 'Provider account mapping saved; awaiting initial verified ingestion.',
+      reason: 'Confirmed provider mapping exists; awaiting initial verified ingestion.',
     };
   }
 
-  // Case 3: Mappings and telemetry exist, but data is older than the freshness window
   if (!isFresh) {
     return {
       certificationState: 'STALE_MAPPED',
@@ -107,7 +155,6 @@ export function evaluateClientDataProvenance(
     };
   }
 
-  // Case 4: Verified mapping + verified connection + fresh telemetry + DB certification flag
   if (hasVerifiedMapping && isFresh && input.dbIsCertifiedFlag) {
     return {
       certificationState: 'CERTIFIED_LIVE',
@@ -116,7 +163,7 @@ export function evaluateClientDataProvenance(
       hasHistoricalData: true,
       latestMetricDate: input.latestMetricDate,
       stalenessDays,
-      reason: 'Verified provider mappings and current telemetry confirmed.',
+      reason: 'Confirmed provider mappings, active connections, and current telemetry verified.',
     };
   }
 
@@ -127,6 +174,7 @@ export function evaluateClientDataProvenance(
     hasHistoricalData: true,
     latestMetricDate: input.latestMetricDate,
     stalenessDays,
-    reason: 'Telemetry present but live provider connection verification is incomplete.',
+    reason: 'Telemetry present but active provider connection verification is incomplete.',
   };
 }
+// EOF
