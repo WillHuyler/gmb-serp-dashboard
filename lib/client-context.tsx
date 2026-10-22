@@ -1,7 +1,6 @@
 'use client';
 
 import React, { createContext, useContext, useState, useEffect, useCallback, ReactNode } from 'react';
-import type { DataCertificationState } from './data-certification';
 
 export type ProviderMappingKey =
   | 'gmb_account_id'
@@ -47,7 +46,7 @@ export interface ClientProfile {
   currency?: string | null;
   status?: 'active' | 'onboarding' | 'inactive' | string;
   is_certified: boolean;
-  certification_state?: DataCertificationState;
+  certification_state?: string;
   has_historical_data?: boolean;
   latest_metric_date?: string | null;
   staleness_days?: number | null;
@@ -95,4 +94,94 @@ export function ClientProvider({ children }: { children: ReactNode }) {
 
   const refreshClients = useCallback(async () => {
     setIsLoading(true);
-    set
+    setError(null);
+    try {
+      const res = await fetch('/api/clients', { cache: 'no-store', credentials: 'include' });
+      if (res.status === 401 || res.status === 403) {
+        setClientList([]);
+        setActiveClientState(null);
+        setAuthStatus(res.status === 401 ? 'unauthenticated' : 'forbidden');
+        setError(res.status === 401 ? 'Authentication required (401).' : 'Access forbidden (403).');
+        return;
+      }
+      if (!res.ok) {
+        setClientList([]);
+        setActiveClientState(null);
+        setAuthStatus('error');
+        setError(`Failed to load clients (HTTP ${res.status}).`);
+        return;
+      }
+      const data = await res.json();
+      const loaded: ClientProfile[] = Array.isArray(data.clients) ? data.clients : [];
+      setClientList(loaded);
+      setAuthStatus('authenticated');
+      if (loaded.length === 0) {
+        setActiveClientState(null);
+        return;
+      }
+      const urlId = typeof window !== 'undefined' ? new URLSearchParams(window.location.search).get('clientId') : null;
+      const savedId = typeof window !== 'undefined' ? localStorage.getItem('porchlight_active_client_id') : null;
+      const targetId = urlId || savedId;
+      setActiveClientState(loaded.find((c) => c.id === targetId) || loaded[0]);
+    } catch (err: any) {
+      setClientList([]);
+      setActiveClientState(null);
+      setAuthStatus('error');
+      setError(err?.message || 'Error loading clients.');
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    refreshClients();
+  }, [refreshClients]);
+
+  const setActiveClient = (client: ClientProfile | null) => {
+    setIsLoading(true);
+    setActiveClientState(client);
+    if (typeof window !== 'undefined') {
+      if (client) localStorage.setItem('porchlight_active_client_id', client.id);
+      else localStorage.removeItem('porchlight_active_client_id');
+    }
+    setTimeout(() => setIsLoading(false), 50);
+  };
+
+  const setActiveClientId = (id: string) => {
+    setActiveClient(clientList.find((c) => c.id === id) || null);
+  };
+
+  const addClient = (newClient: ClientProfile) => {
+    setClientList((prev) => [...prev, newClient]);
+    setActiveClient(newClient);
+  };
+
+  return (
+    <ClientContext.Provider
+      value={{
+        activeClient,
+        availableClients: clientList,
+        clients: clientList,
+        clientRegistry: clientList,
+        setActiveClient,
+        setActiveClientId,
+        addClient,
+        refreshClients,
+        isLoading,
+        authStatus,
+        error,
+      }}
+    >
+      {children}
+    </ClientContext.Provider>
+  );
+}
+
+export function useClient() {
+  const context = useContext(ClientContext);
+  if (!context) {
+    throw new Error('useClient must be used within a ClientProvider');
+  }
+  return context;
+}
+// END OF FILE
