@@ -78,6 +78,7 @@ interface ClientContextType {
   addClient: (newClient: ClientProfile) => void;
   refreshClients: () => Promise<void>;
   isLoading: boolean;
+  error: string | null;
 }
 
 const ClientContext = createContext<ClientContextType | undefined>(undefined);
@@ -86,9 +87,11 @@ export function ClientProvider({ children }: { children: ReactNode }) {
   const [clientList, setClientList] = useState<ClientProfile[]>(AUTHORITATIVE_CLIENT_REGISTRY);
   const [activeClient, setActiveClientState] = useState<ClientProfile | null>(AUTHORITATIVE_CLIENT_REGISTRY[0]);
   const [isLoading, setIsLoading] = useState<boolean>(false);
+  const [error, setError] = useState<string | null>(null);
 
   const refreshClients = async () => {
     try {
+      setError(null);
       const res = await fetch('/api/clients', { cache: 'no-store' });
       if (!res.ok) return;
       const data = await res.json();
@@ -101,7 +104,8 @@ export function ClientProvider({ children }: { children: ReactNode }) {
         const nextActive = data.clients.find((c: ClientProfile) => c.id === targetId) || data.clients[0];
         if (nextActive) setActiveClientState(nextActive);
       }
-    } catch (err) {
+    } catch (err: any) {
+      setError(err?.message || null);
       console.warn('Using canonical client registry fallback:', err);
     }
   };
@@ -145,6 +149,7 @@ export function ClientProvider({ children }: { children: ReactNode }) {
         addClient,
         refreshClients,
         isLoading,
+        error,
       }}
     >
       {children}
