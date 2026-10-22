@@ -39,9 +39,13 @@ export interface ClientProfile {
   store_code?: string | null;
   address?: string | null;
   domain?: string | null;
+  industry?: string | null;
+  status?: 'active' | 'onboarding' | 'inactive' | string;
   is_certified: boolean;
   data_certification_status?: string;
   type?: 'REAL' | 'TEST';
+  created_at?: string;
+  organization_id?: string | null;
   service_areas: string[];
   mappings: ClientMappings;
 }
@@ -57,6 +61,7 @@ export const AUTHORITATIVE_CLIENT_REGISTRY: ClientProfile[] = [
     store_code: '1003001',
     address: 'Delavan, WI, USA',
     domain: 'highrisechimney.com',
+    status: 'active',
     is_certified: true,
     data_certification_status: 'DATA_REVIEW_REQUIRED',
     type: 'REAL',
@@ -78,6 +83,7 @@ export const AUTHORITATIVE_CLIENT_REGISTRY: ClientProfile[] = [
     store_code: '9478581082636497192',
     address: '1534 N 9th St, Stroudsburg, PA 18360',
     domain: 'kellyhyundai.com',
+    status: 'onboarding',
     is_certified: false,
     data_certification_status: 'DATA_REVIEW_REQUIRED',
     type: 'REAL',
@@ -93,6 +99,7 @@ export const AUTHORITATIVE_CLIENT_REGISTRY: ClientProfile[] = [
     store_code: '06510819750374635156',
     address: '1534 N 9th St, Stroudsburg, PA 18360',
     domain: 'kellyhyundai.com',
+    status: 'onboarding',
     is_certified: false,
     data_certification_status: 'DATA_REVIEW_REQUIRED',
     type: 'REAL',
@@ -108,6 +115,7 @@ export const AUTHORITATIVE_CLIENT_REGISTRY: ClientProfile[] = [
     store_code: '1318998720183880132',
     address: '1965 Kyle Park Ct, San Jose, CA 95125',
     domain: null,
+    status: 'onboarding',
     is_certified: false,
     data_certification_status: 'DATA_REVIEW_REQUIRED',
     type: 'REAL',
@@ -123,6 +131,7 @@ export const AUTHORITATIVE_CLIENT_REGISTRY: ClientProfile[] = [
     store_code: '2613472_1',
     address: '2016 Gadsden St., Columbia, SC 29201',
     domain: null,
+    status: 'onboarding',
     is_certified: false,
     data_certification_status: 'DATA_REVIEW_REQUIRED',
     type: 'REAL',
@@ -138,6 +147,7 @@ export const AUTHORITATIVE_CLIENT_REGISTRY: ClientProfile[] = [
     store_code: '06814199601923124542',
     address: '11 Hamburg Turnpike, Riverdale, NJ 07457',
     domain: null,
+    status: 'onboarding',
     is_certified: false,
     data_certification_status: 'DATA_REVIEW_REQUIRED',
     type: 'REAL',
@@ -153,6 +163,7 @@ export const AUTHORITATIVE_CLIENT_REGISTRY: ClientProfile[] = [
     store_code: '06832735424770532428',
     address: '506 E College St, Suite B, Dickson, TN 37055',
     domain: null,
+    status: 'onboarding',
     is_certified: false,
     data_certification_status: 'DATA_REVIEW_REQUIRED',
     type: 'REAL',
@@ -168,6 +179,7 @@ export const AUTHORITATIVE_CLIENT_REGISTRY: ClientProfile[] = [
     store_code: null,
     address: '301 S. Main St., Ste. A, Dickson, TN 37055',
     domain: null,
+    status: 'onboarding',
     is_certified: false,
     data_certification_status: 'DATA_REVIEW_REQUIRED',
     type: 'REAL',
@@ -181,119 +193,5 @@ export const AUTHORITATIVE_CLIENT_REGISTRY: ClientProfile[] = [
     store_code: null,
     address: null,
     domain: 'abcmotors.com',
-    is_certified: false,
-    data_certification_status: 'DATA_REVIEW_REQUIRED',
-    type: 'TEST',
-    service_areas: [],
-    mappings: {},
-  },
-];
-
-export const CANONICAL_CLIENTS = AUTHORITATIVE_CLIENT_REGISTRY;
-
-interface ClientContextType {
-  activeClient: ClientProfile | null;
-  availableClients: ClientProfile[];
-  clients: ClientProfile[];
-  clientRegistry: ClientProfile[];
-  setActiveClient: (client: ClientProfile) => void;
-  setActiveClientId: (id: string) => void;
-  addClient: (newClient: ClientProfile) => void;
-  refreshClients: () => Promise<void>;
-  isLoading: boolean;
-}
-
-const ClientContext = createContext<ClientContextType | undefined>(undefined);
-
-export function ClientProvider({ children }: { children: ReactNode }) {
-  const [clientList, setClientList] = useState<ClientProfile[]>(AUTHORITATIVE_CLIENT_REGISTRY);
-  const [activeClient, setActiveClientState] = useState<ClientProfile | null>(AUTHORITATIVE_CLIENT_REGISTRY[0]);
-  const [isLoading, setIsLoading] = useState<boolean>(false);
-
-  const refreshClients = async () => {
-    try {
-      const res = await fetch('/api/clients', { cache: 'no-store' });
-      if (!res.ok) return;
-      const data = await res.json();
-      if (data.success && Array.isArray(data.clients) && data.clients.length > 0) {
-        setClientList(data.clients);
-        const urlParams = typeof window !== 'undefined' ? new URLSearchParams(window.location.search) : null;
-        const urlClientId = urlParams?.get('clientId');
-        const savedId = typeof window !== 'undefined' ? localStorage.getItem('porchlight_active_client_id') : null;
-        const targetId = urlClientId || savedId || activeClient?.id;
-
-        const nextActive =
-          data.clients.find((c: ClientProfile) => c.id === targetId) ||
-          data.clients[0];
-
-        if (nextActive) {
-          setActiveClientState(nextActive);
-        }
-      }
-    } catch (err) {
-      console.warn('Using canonical client registry fallback:', err);
-    }
-  };
-
-  useEffect(() => {
-    const urlParams = typeof window !== 'undefined' ? new URLSearchParams(window.location.search) : null;
-    const urlClientId = urlParams?.get('clientId');
-    const savedClientId = typeof window !== 'undefined' ? localStorage.getItem('porchlight_active_client_id') : null;
-    const initialId = urlClientId || savedClientId;
-
-    if (initialId) {
-      const match = clientList.find((c) => c.id === initialId);
-      if (match) {
-        setActiveClientState(match);
-      }
-    }
-    refreshClients();
-  }, []);
-
-  const setActiveClient = (client: ClientProfile) => {
-    setIsLoading(true);
-    setActiveClientState(client);
-    if (typeof window !== 'undefined') {
-      localStorage.setItem('porchlight_active_client_id', client.id);
-    }
-    setTimeout(() => setIsLoading(false), 150);
-  };
-
-  const setActiveClientId = (id: string) => {
-    const match = clientList.find((c) => c.id === id);
-    if (match) {
-      setActiveClient(match);
-    }
-  };
-
-  const addClient = (newClient: ClientProfile) => {
-    setClientList((prev) => [...prev, newClient]);
-    setActiveClient(newClient);
-  };
-
-  return (
-    <ClientContext.Provider
-      value={{
-        activeClient,
-        availableClients: clientList,
-        clients: clientList,
-        clientRegistry: clientList,
-        setActiveClient,
-        setActiveClientId,
-        addClient,
-        refreshClients,
-        isLoading,
-      }}
-    >
-      {children}
-    </ClientContext.Provider>
-  );
-}
-
-export function useClient() {
-  const context = useContext(ClientContext);
-  if (!context) {
-    throw new Error('useClient must be used within a ClientProvider');
-  }
-  return context;
-}
+    status: 'onboarding',
+    is_certified:
