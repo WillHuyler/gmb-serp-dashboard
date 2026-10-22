@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
-import { VerifiedUserContext, evaluateTenantAccess, evaluateClientAccessPolicy } from './auth-policy';
+import { evaluateTenantAccess, evaluateClientAccessPolicy } from './auth-policy';
 
 export const AUTH_COOKIE_ACCESS = 'sb-access-token';
 export const AUTH_COOKIE_REFRESH = 'sb-refresh-token';
@@ -24,10 +24,10 @@ export interface AuthValidationResult {
   response?: NextResponse;
 }
 
-function fail(status: number, error: string, message: string): AuthValidationResult {
-  const res = NextResponse.json({ success: false, error, message }, { status });
-  return { authorized: false, status, errorResponse: res, response: res };
-}
+const fail = (status: number, error: string, message: string): AuthValidationResult => {
+  const r = NextResponse.json({ success: false, error, message }, { status });
+  return { authorized: false, status, errorResponse: r, response: r };
+};
 
 export function extractAccessToken(req: NextRequest): string | null {
   const h = req.headers.get('authorization') || req.headers.get('Authorization');
@@ -37,8 +37,7 @@ export function extractAccessToken(req: NextRequest): string | null {
     if (c.name.startsWith('sb-') && c.name.endsWith('-auth-token') && c.value) {
       try {
         const p = JSON.parse(c.value);
-        if (Array.isArray(p) && typeof p[0] === 'string') return p[0];
-        if (p?.access_token) return p.access_token;
+        return Array.isArray(p) ? p[0] : (p?.access_token || null);
       } catch {
         if (c.value.split('.').length === 3) return c.value;
       }
@@ -47,38 +46,54 @@ export function extractAccessToken(req: NextRequest): string | null {
   return null;
 }
 
-export function getServerSupabaseClient(accessToken?: string | null): SupabaseClient {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
-  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || '';
-  const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
-  const opts = accessToken
-    ? { auth: { persistSession: false, autoRefreshToken: false }, global: { headers: { Authorization: `Bearer ${accessToken}` } } }
-    : { auth: { persistSession: false, autoRefreshToken: false } };
-  return createClient(url, accessToken ? anonKey : (serviceKey || anonKey), opts);
+export function getServerSupabaseClient(token?: string | null): SupabaseClient {
+  const u = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
+  const k = token ? (process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '') : (process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '');
+  const o: any = { auth: { persistSession: false, autoRefreshToken: false } };
+  if (token) o.global = { headers: { Authorization: `Bearer ${token}` } };
+  return createClient(u, k, o);
 }
 
-export async function requireAuthenticatedSession(req: NextRequest, requestedTenantId?: string | null): Promise<AuthValidationResult> {
+export async function requireAuthenticatedSession(req: NextRequest, reqTenantId?: string | null): Promise<AuthValidationResult> {
   const token = extractAccessToken(req);
   if (!token) return fail(401, 'UNAUTHENTICATED', 'Authentication required.');
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
-  const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
-  if (!url || !anonKey) return fail(503, 'AUTH_UNAVAILABLE', 'Supabase env missing.');
-
-  const userClient = getServerSupabaseClient(token);
-  const metaClient = getServerSupabaseClient();
-  const { data: { user }, error: authErr } = await userClient.auth.getUser(token);
-  if (authErr || !user) return fail(401, 'INVALID_SESSION', 'Invalid or expired session.');
+  const uClient = getServerSupabaseClient(token);
+  const mClient = getServerSupabaseClient();
+  const { data: { user }, error: aErr } = await uClient.auth.getUser(token);
+  if (aErr || !user) return fail(401, 'INVALID_SESSION', 'Invalid session.');
 
   const [{ data: prof }, { data: mems }] = await Promise.all([
-    metaClient.from('profiles').select('id, role, is_super_admin').eq('id', user.id).maybeSingle(),
-    metaClient.from('tenant_memberships').select('tenant_id, role').eq('user_id', user.id),
+    mClient.from('profiles').select('id, role, is_super_admin').eq('id', user.id).maybeSingle(),
+    mClient.from('tenant_memberships').select('tenant_id').eq('user_id', user.id),
   ]);
-
   const isSuperAdmin = Boolean(prof?.is_super_admin || prof?.role === 'super_admin' || prof?.role === 'PLATFORM_SUPER_ADMIN');
-  let authorizedTenantIds = Array.from(new Set((mems || []).map((m: any) => m.tenant_id).filter(Boolean))) as string[];
-  if (isSuperAdmin && authorizedTenantIds.length === 0) {
-    const { data: tRows } = await metaClient.from('tenants').select('id');
-    authorizedTenantIds = (tRows || []).map((t: any) => t.id);
+  let tIds = Array.from(new Set((mems || []).map((m: any) => m.tenant_id).filter(Boolean))) as string[];
+  if (isSuperAdmin && !tIds.length) {
+    const { data: tRows } = await mClient.from('tenants').select('id');
+    tIds = (tRows || []).map((t: any) => t.id);
   }
+  const dec = evaluateTenantAccess({ userId: user.id, email: user.email, isSuperAdmin, authorizedTenantIds: tIds }, reqTenantId);
+  if (!dec.allowed) return fail(dec.status, dec.code, dec.message);
 
-  const verifiedUser: VerifiedUserContext = { userId: user.id, email: user.email
+  const { data: cRows } = await mClient.from('clients').select('id').in('tenant_id', tIds.length ? tIds : [dec.effectiveTenantId]);
+  const cIds = (cRows || []).map((c: any) => c.id);
+  return {
+    authorized: true,
+    status: 200,
+    context: { userId: user.id, email: user.email, role: isSuperAdmin ? 'PLATFORM_SUPER_ADMIN' : (prof?.role || 'member'), tenantId: dec.effectiveTenantId, authorizedTenantIds: tIds, authorizedClientIds: cIds, isSuperAdmin },
+    supabase: mClient,
+  };
+}
+
+export const resolveAuthenticatedContext = requireAuthenticatedSession;
+
+export async function validateClientAccess(req: NextRequest, clientId?: string | null, reqTenantId?: string | null): Promise<AuthValidationResult> {
+  const s = await requireAuthenticatedSession(req, reqTenantId);
+  if (!s.authorized || !s.context || !s.supabase || !clientId) return s;
+  const { data: row, error } = await s.supabase.from('clients').select('id, tenant_id').eq('id', clientId).maybeSingle();
+  if (error) return fail(500, 'CLIENT_LOOKUP_FAILED', 'Lookup error.');
+  const d = evaluateClientAccessPolicy({ userId: s.context.userId, email: s.context.email, isSuperAdmin: s.context.isSuperAdmin, authorizedTenantIds: s.context.authorizedTenantIds }, row, reqTenantId);
+  if (!d.allowed) return fail(d.status, d.code, d.message);
+  return { ...s, context: { ...s.context, tenantId: d.effectiveTenantId } };
+}
+// EOF
