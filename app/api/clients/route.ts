@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import {
   resolveAuthenticatedContext,
-  getUserScopedSupabaseClient,
   getServerSupabaseClient,
 } from '../../../lib/auth-guard';
 import {
@@ -22,19 +21,13 @@ export async function GET(req: NextRequest) {
     return authCheck.errorResponse!;
   }
 
-  const { authorizedTenantIds, accessToken, userId, email, role } = authCheck.context;
+  const { authorizedTenantIds, userId, email, role } = authCheck.context;
   const warnings: string[] = [];
 
   try {
-    // Prefer user-scoped RLS client; fall back to server client if configured
-    let supabase = getUserScopedSupabaseClient(accessToken);
-    try {
-      supabase = getServerSupabaseClient(req);
-    } catch {
-      // User-scoped JWT client is active and passes strict_tenant_clients_policy via RLS
-    }
+    const supabase = getServerSupabaseClient(req);
 
-    // 1. Primary Authoritative Query: public.clients (MUST succeed independently)
+    // 1. Primary Authoritative Query: public.clients (Decoupled from secondary tables)
     const { data: clientRows, error: clientErr } = await supabase
       .from('clients')
       .select(VERIFIED_CLIENT_COLUMNS)
@@ -61,7 +54,7 @@ export async function GET(req: NextRequest) {
     let integrationAccounts: RawIntegrationAccountRow[] = [];
     const clientsWithMetrics = new Set<string>();
 
-    // 2. Supplementary Queries: Isolated in fault-tolerant blocks so they NEVER break client loading
+    // 2. Supplementary Queries: Isolated in Promise.allSettled so they NEVER fail the client list
     if (clientIds.length > 0) {
       const [mapSettled, extSettled, intSettled, metricsSettled] = await Promise.allSettled([
         supabase
@@ -169,7 +162,7 @@ export async function POST(req: NextRequest) {
     return authCheck.errorResponse!;
   }
 
-  const { tenantId: primaryTenantId, authorizedTenantIds, accessToken } = authCheck.context;
+  const { tenantId: primaryTenantId, authorizedTenantIds } = authCheck.context;
 
   try {
     const body = await req.json();
@@ -189,7 +182,6 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Prefer tenant 00000000-0000-0000-0000-000000000001 if authorized so new clients join the main portfolio
     const defaultPortfolioTenant = authorizedTenantIds.includes(
       '00000000-0000-0000-0000-000000000001'
     )
@@ -213,58 +205,4 @@ export async function POST(req: NextRequest) {
       targetTenantId = requested_tenant_id;
     }
 
-    let supabase = getUserScopedSupabaseClient(accessToken);
-    try {
-      supabase = getServerSupabaseClient(req);
-    } catch {
-      // Use user-scoped client
-    }
-
-    const insertPayload: Record<string, any> = {
-      tenant_id: targetTenantId,
-      name: name.trim(),
-      address: typeof address === 'string' && address.trim() !== '' ? address.trim() : null,
-      domain: typeof domain === 'string' && domain.trim() !== '' ? domain.trim() : null,
-      store_code:
-        typeof store_code === 'string' && store_code.trim() !== '' ? store_code.trim() : null,
-      organization_id:
-        typeof organization_id === 'string' && organization_id.trim() !== ''
-          ? organization_id.trim()
-          : null,
-      data_certification_status: 'DATA_REVIEW_REQUIRED',
-      is_certified: false,
-    };
-
-    const { data: inserted, error: insertErr } = await supabase
-      .from('clients')
-      .insert([insertPayload])
-      .select(VERIFIED_CLIENT_COLUMNS)
-      .single();
-
-    if (insertErr || !inserted) {
-      return NextResponse.json(
-        {
-          success: false,
-          error: {
-            code: 'CLIENT_CREATE_FAILED',
-            message: insertErr?.message || 'Failed to insert client.',
-          },
-        },
-        { status: 500 }
-      );
-    }
-
-    return NextResponse.json(
-      {
-        success: true,
-        client: normalizeVerifiedClientRecord(inserted, [], [], false),
-      },
-      { status: 201 }
-    );
-  } catch (err: any) {
-    return NextResponse.json(
-      { success: false, error: { code: 'CLIENT_POST_ERROR', message: err.message } },
-      { status: 500 }
-    );
-  }
-}
+    const supabase = getServerSupabaseClient(
