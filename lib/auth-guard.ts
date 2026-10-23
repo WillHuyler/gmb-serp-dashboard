@@ -14,6 +14,7 @@ export interface AuthenticatedContext {
 export interface AuthGuardResult {
   authorized: boolean;
   context?: AuthenticatedContext;
+  supabase?: SupabaseClient;
   errorResponse?: NextResponse;
   response?: NextResponse;
   [key: string]: any;
@@ -191,6 +192,7 @@ export async function resolveAuthenticatedContext(
 
     return {
       authorized: true,
+      supabase: userSupabase,
       context: {
         userId,
         email,
@@ -221,13 +223,36 @@ export async function resolveAuthenticatedContext(
 
 export async function validateClientAccess(
   req: NextRequest,
-  clientId: string,
-  requireWriteAccess: boolean = false
+  clientId: string | null | undefined,
+  thirdArg?: boolean | string | null
 ): Promise<AuthGuardResult> {
   const authCheck = await resolveAuthenticatedContext(req);
   if (!authCheck.authorized || !authCheck.context) {
     return authCheck;
   }
+
+  if (!clientId) {
+    const errRes = NextResponse.json(
+      {
+        success: false,
+        error: {
+          code: 'MISSING_CLIENT_ID',
+          message: 'A valid clientId is required.',
+        },
+      },
+      { status: 400 }
+    );
+    return {
+      authorized: false,
+      errorResponse: errRes,
+      response: errRes,
+    };
+  }
+
+  const requestedTenantId =
+    typeof thirdArg === 'string' && thirdArg.trim() !== ''
+      ? thirdArg.trim()
+      : null;
 
   try {
     const supabase = getUserScopedSupabaseClient(authCheck.context.accessToken);
@@ -255,46 +280,4 @@ export async function validateClientAccess(
       };
     }
 
-    if (!authCheck.context.authorizedTenantIds.includes(clientRow.tenant_id)) {
-      const errRes = NextResponse.json(
-        {
-          success: false,
-          error: {
-            code: 'CROSS_TENANT_DENIED',
-            message: 'Cross-tenant client access is strictly forbidden.',
-          },
-        },
-        { status: 403 }
-      );
-      return {
-        authorized: false,
-        errorResponse: errRes,
-        response: errRes,
-      };
-    }
-
-    return {
-      authorized: true,
-      context: {
-        ...authCheck.context,
-        tenantId: clientRow.tenant_id,
-      },
-    };
-  } catch (err: any) {
-    const errRes = NextResponse.json(
-      {
-        success: false,
-        error: {
-          code: 'CLIENT_ACCESS_CHECK_FAILED',
-          message: err?.message || 'Error validating client access.',
-        },
-      },
-      { status: 500 }
-    );
-    return {
-      authorized: false,
-      errorResponse: errRes,
-      response: errRes,
-    };
-  }
-}
+    if (requestedTenantId && client
