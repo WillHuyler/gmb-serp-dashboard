@@ -1,8 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { validateClientAccess, getServerSupabaseClient } from '../../../../../lib/auth-guard';
-import { normalizeVerifiedClientRecord } from '../../../../../lib/client-row-normalizer';
+import {
+  normalizeVerifiedClientRecord,
+  RawIntegrationAccountRow,
+} from '../../../../../lib/client-row-normalizer';
 
 export const dynamic = 'force-dynamic';
+
+const VERIFIED_CLIENT_COLUMNS =
+  'id, name, store_code, address, created_at, organization_id, tenant_id, data_certification_status, domain, is_certified';
 
 export async function GET(
   req: NextRequest,
@@ -22,7 +28,7 @@ export async function GET(
     const [clientRes, mappingsRes, integrationAccountsRes, metricsRes] = await Promise.all([
       supabase
         .from('clients')
-        .select('id, tenant_id, name, domain, timezone, currency, is_certified, created_at')
+        .select(VERIFIED_CLIENT_COLUMNS)
         .eq('id', clientId)
         .eq('tenant_id', tenantId)
         .single(),
@@ -33,13 +39,13 @@ export async function GET(
         .eq('tenant_id', tenantId),
       supabase
         .from('integration_accounts')
-        .select('*')
-        .eq('client_id', clientId),
+        .select('id, tenant_id, client_id, provider, provider_account_id, auth_status, last_sync_at, last_success_sync_at, sync_error_message, created_at')
+        .eq('client_id', clientId)
+        .eq('tenant_id', tenantId),
       supabase
         .from('daily_client_metrics')
         .select('client_id')
         .eq('client_id', clientId)
-        .eq('tenant_id', tenantId)
         .limit(1),
     ]);
 
@@ -57,7 +63,7 @@ export async function GET(
     if (extIds.length > 0) {
       const { data: extRows } = await supabase
         .from('external_accounts')
-        .select('id, connection_id, provider, external_account_id, descriptive_name, account_type, status, currency, timezone, discovered_at')
+        .select('id, connection_id, provider, external_account_id, descriptive_name, account_type, status, currency, timezone, discovered_at, tenant_id')
         .in('id', extIds);
       (extRows || []).forEach((e: any) => externalMap.set(e.id, e));
     }
@@ -67,10 +73,13 @@ export async function GET(
       external_account: externalMap.get(m.external_account_id) || null,
     }));
 
+    const intAccounts = (integrationAccountsRes.data || []) as RawIntegrationAccountRow[];
     const hasVerifiedTelemetry = (metricsRes.data || []).length > 0;
+
     const normalizedClient = normalizeVerifiedClientRecord(
       clientRes.data,
       joinedMappings,
+      intAccounts,
       hasVerifiedTelemetry
     );
 
@@ -81,7 +90,7 @@ export async function GET(
       isCertified: normalizedClient.is_certified,
       hasVerifiedTelemetry,
       accountMappings: joinedMappings,
-      integrationAccounts: integrationAccountsRes.data || [],
+      integrationAccounts: intAccounts,
       resolvedMappings: normalizedClient.mappings,
       meta: {
         timestamp: new Date().toISOString(),
