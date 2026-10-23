@@ -205,4 +205,53 @@ export async function POST(req: NextRequest) {
       targetTenantId = requested_tenant_id;
     }
 
-    const supabase = getServerSupabaseClient(
+    const supabase = getServerSupabaseClient(req);
+
+    const insertPayload: Record<string, any> = {
+      tenant_id: targetTenantId,
+      name: name.trim(),
+      address: typeof address === 'string' && address.trim() !== '' ? address.trim() : null,
+      domain: typeof domain === 'string' && domain.trim() !== '' ? domain.trim() : null,
+      store_code:
+        typeof store_code === 'string' && store_code.trim() !== '' ? store_code.trim() : null,
+      organization_id:
+        typeof organization_id === 'string' && organization_id.trim() !== ''
+          ? organization_id.trim()
+          : null,
+      data_certification_status: 'DATA_REVIEW_REQUIRED',
+      is_certified: false,
+    };
+
+    const { data: inserted, error: insertErr } = await supabase
+      .from('clients')
+      .insert([insertPayload])
+      .select(VERIFIED_CLIENT_COLUMNS)
+      .single();
+
+    if (insertErr || !inserted) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: {
+            code: 'CLIENT_CREATE_FAILED',
+            message: insertErr?.message || 'Failed to insert client.',
+          },
+        },
+        { status: 500 }
+      );
+    }
+
+    return NextResponse.json(
+      {
+        success: true,
+        client: normalizeVerifiedClientRecord(inserted, [], [], false),
+      },
+      { status: 201 }
+    );
+  } catch (err: any) {
+    return NextResponse.json(
+      { success: false, error: { code: 'CLIENT_POST_ERROR', message: err.message } },
+      { status: 500 }
+    );
+  }
+}
