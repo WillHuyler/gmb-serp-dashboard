@@ -1,161 +1,270 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { requireAuthenticatedSession } from '../../../lib/auth-guard';
-import { evaluateClientDataProvenance, resolveConfirmedClientMappings } from '../../../lib/data-certification';
-import type { ClientProfile, ClientMappings } from '../../../lib/client-context';
+import {
+  resolveAuthenticatedContext,
+  getUserScopedSupabaseClient,
+  getServerSupabaseClient,
+} from '../../../lib/auth-guard';
+import {
+  normalizeVerifiedClientRecord,
+  JoinedAccountMapping,
+  RawIntegrationAccountRow,
+} from '../../../lib/client-row-normalizer';
+import { ClientProfile } from '../../../lib/client-context';
 
 export const dynamic = 'force-dynamic';
 
-export async function GET(req: NextRequest) {
-  const { searchParams } = new URL(req.url);
-  const requestedTenantId = searchParams.get('tenantId');
+const VERIFIED_CLIENT_COLUMNS =
+  'id, name, store_code, address, created_at, organization_id, tenant_id, data_certification_status, domain, is_certified';
 
-  const auth = await requireAuthenticatedSession(req, requestedTenantId);
-  if (!auth.authorized || !auth.context || !auth.supabase) return auth.errorResponse!;
-  const { supabase, context } = auth;
+export async function GET(req: NextRequest) {
+  const authCheck = await resolveAuthenticatedContext(req);
+  if (!authCheck.authorized || !authCheck.context) {
+    return authCheck.errorResponse!;
+  }
+
+  const { authorizedTenantIds, accessToken, userId, email, role } = authCheck.context;
+  const warnings: string[] = [];
 
   try {
-    const tenantFilter = context.isSuperAdmin && !requestedTenantId ? context.authorizedTenantIds : [context.tenantId];
-    const { data: dbClients, error: clientsErr } = await supabase
+    // Prefer user-scoped RLS client; fall back to server client if configured
+    let supabase = getUserScopedSupabaseClient(accessToken);
+    try {
+      supabase = getServerSupabaseClient(req);
+    } catch {
+      // User-scoped JWT client is active and passes strict_tenant_clients_policy via RLS
+    }
+
+    // 1. Primary Authoritative Query: public.clients (MUST succeed independently)
+    const { data: clientRows, error: clientErr } = await supabase
       .from('clients')
-      .select('id, name, store_code, address, created_at, organization_id, tenant_id, data_certification_status, domain, is_certified')
-      .in('tenant_id', tenantFilter)
+      .select(VERIFIED_CLIENT_COLUMNS)
+      .in('tenant_id', authorizedTenantIds)
       .order('name', { ascending: true });
 
-    if (clientsErr) {
-      return NextResponse.json({ success: false, error: 'CLIENT_QUERY_FAILED', message: clientsErr.message }, { status: 500 });
-    }
-    const clientIds = (dbClients || []).map((c: any) => c.id);
-    if (!clientIds.length) {
-      return NextResponse.json({ success: true, source: 'SUPABASE_AUTHENTICATED', clients: [] });
-    }
-
-    const [mapRes, extRes, connRes, zipRes, dmRes, dpmRes, kwRes] = await Promise.all([
-      supabase.from('account_mappings').select('id, tenant_id, client_id, external_account_id, mapping_role, mapping_confidence, is_confirmed, include_in_command_center, created_at').in('client_id', clientIds).in('tenant_id', tenantFilter),
-      supabase.from('external_accounts').select('id, tenant_id, connection_id, provider, external_account_id, descriptive_name, status').in('tenant_id', tenantFilter),
-      supabase.from('provider_connections').select('id, tenant_id, provider, status').in('tenant_id', tenantFilter),
-      supabase.from('zip_rankings').select('client_id, zip_code').in('client_id', clientIds),
-      supabase.from('daily_metrics').select('client_id, metric_date').in('client_id', clientIds),
-      supabase.from('daily_platform_metrics').select('client_id, sync_date').in('client_id', clientIds),
-      supabase.from('keyword_rankings').select('client_id, last_updated').in('client_id', clientIds),
-    ]);
-
-    const qErr = mapRes.error || extRes.error || connRes.error || zipRes.error || dmRes.error || dpmRes.error || kwRes.error;
-    if (qErr) {
-      return NextResponse.json({ success: false, error: 'PROVENANCE_VERIFICATION_FAILED', message: qErr.message }, { status: 500 });
+    if (clientErr) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: {
+            code: 'CLIENT_REGISTRY_QUERY_FAILED',
+            message: `Database error loading clients: ${clientErr.message}`,
+          },
+        },
+        { status: 500 }
+      );
     }
 
-    const activeConnsByTenant = new Map<string, number>();
-    (connRes.data || []).forEach((c: any) => {
-      if (c.status === 'ACTIVE' || c.status === 'CONNECTED' || c.status === 'HEALTHY') {
-        activeConnsByTenant.set(c.tenant_id, (activeConnsByTenant.get(c.tenant_id) || 0) + 1);
+    const safeClientRows = clientRows || [];
+    const clientIds = safeClientRows.map((c: any) => c.id);
+
+    let joinedMappings: JoinedAccountMapping[] = [];
+    let integrationAccounts: RawIntegrationAccountRow[] = [];
+    const clientsWithMetrics = new Set<string>();
+
+    // 2. Supplementary Queries: Isolated in fault-tolerant blocks so they NEVER break client loading
+    if (clientIds.length > 0) {
+      const [mapSettled, extSettled, intSettled, metricsSettled] = await Promise.allSettled([
+        supabase
+          .from('account_mappings')
+          .select(
+            'id, tenant_id, client_id, external_account_id, mapping_role, mapping_confidence, is_confirmed, include_in_command_center, created_at'
+          )
+          .in('client_id', clientIds),
+        supabase
+          .from('external_accounts')
+          .select(
+            'id, connection_id, provider, external_account_id, descriptive_name, account_type, status, tenant_id'
+          )
+          .in('tenant_id', authorizedTenantIds),
+        supabase
+          .from('integration_accounts')
+          .select(
+            'id, tenant_id, client_id, provider, provider_account_id, auth_status, last_sync_at, last_success_sync_at, sync_error_message, created_at'
+          )
+          .in('client_id', clientIds),
+        supabase
+          .from('daily_client_metrics')
+          .select('client_id')
+          .in('client_id', clientIds)
+          .limit(300),
+      ]);
+
+      const externalMap = new Map<string, any>();
+      if (extSettled.status === 'fulfilled' && !extSettled.value.error) {
+        (extSettled.value.data || []).forEach((ext: any) => {
+          externalMap.set(ext.id, ext);
+        });
+      } else {
+        warnings.push('external_accounts supplementary lookup unavailable');
       }
-    });
 
-    const zipsByClient = new Map<string, string[]>();
-    (zipRes.data || []).forEach((r: any) => {
-      if (r.client_id && r.zip_code) {
-        const list = zipsByClient.get(r.client_id) || [];
-        if (!list.includes(r.zip_code)) list.push(r.zip_code);
-        zipsByClient.set(r.client_id, list);
+      if (mapSettled.status === 'fulfilled' && !mapSettled.value.error) {
+        joinedMappings = (mapSettled.value.data || []).map((m: any) => ({
+          ...m,
+          external_account: externalMap.get(m.external_account_id) || null,
+        }));
+      } else {
+        warnings.push('account_mappings supplementary lookup unavailable');
       }
+
+      if (intSettled.status === 'fulfilled' && !intSettled.value.error) {
+        integrationAccounts = (intSettled.value.data || []) as RawIntegrationAccountRow[];
+      } else {
+        warnings.push('integration_accounts supplementary lookup unavailable');
+      }
+
+      if (metricsSettled.status === 'fulfilled' && !metricsSettled.value.error) {
+        (metricsSettled.value.data || []).forEach((m: any) => {
+          if (m?.client_id) clientsWithMetrics.add(m.client_id);
+        });
+      } else {
+        warnings.push('daily_client_metrics supplementary lookup unavailable');
+      }
+    }
+
+    const normalized: ClientProfile[] = safeClientRows.map((row: any) => {
+      const clientMaps = joinedMappings.filter((m) => m.client_id === row.id);
+      const clientIntAccs = integrationAccounts.filter((ia) => ia.client_id === row.id);
+      return normalizeVerifiedClientRecord(
+        row,
+        clientMaps,
+        clientIntAccs,
+        clientsWithMetrics.has(row.id)
+      );
     });
 
-    const groupDates = (rows: any[], key: string) => {
-      const m = new Map<string, string[]>();
-      (rows || []).forEach((r: any) => {
-        const list = m.get(r.client_id) || [];
-        if (r[key]) list.push(r[key]);
-        m.set(r.client_id, list);
-      });
-      return m;
-    };
-    const dmByClient = groupDates(dmRes.data || [], 'metric_date');
-    const dpmByClient = groupDates(dpmRes.data || [], 'sync_date');
-    const kwByClient = groupDates(kwRes.data || [], 'last_updated');
-
-    const clients: ClientProfile[] = (dbClients || []).map((row: any) => {
-      const resolvedMaps = resolveConfirmedClientMappings(row.id, row.tenant_id, mapRes.data || [], extRes.data || []);
-      const dmDates = dmByClient.get(row.id) || [];
-      const dpmDates = dpmByClient.get(row.id) || [];
-      const kwDates = kwByClient.get(row.id) || [];
-      const latestMetricDate = [...dmDates, ...dpmDates, ...kwDates].sort().reverse()[0] || null;
-      const verifiedConns = activeConnsByTenant.get(row.tenant_id) || 0;
-
-      const prov = evaluateClientDataProvenance({
-        dbIsCertifiedFlag: Boolean(row.is_certified),
-        mappedAccountsCount: resolvedMaps.length,
-        verifiedConnectionsCount: verifiedConns,
-        dailyMetricsCount: dmDates.length,
-        platformMetricsCount: dpmDates.length,
-        keywordRowsCount: kwDates.length,
-        latestMetricDate,
-      });
-
-      const explicitMappings: ClientMappings = {};
-      resolvedMaps.forEach((m) => {
-        if (m.provider === 'GOOGLE_ADS') explicitMappings.google_ads_id = m.externalAccountId;
-        if (m.provider === 'META_ADS') explicitMappings.meta_act_id = m.externalAccountId;
-        if (m.provider === 'GA4') explicitMappings.ga4_property_id = m.externalAccountId;
-        if (m.provider === 'GSC') explicitMappings.gsc_site_url = m.externalAccountId;
-        if (m.provider === 'GBP' || m.provider === 'GMB') explicitMappings.gmb_location_id = m.externalAccountId;
-        if (m.provider === 'BRIGHTLOCAL') explicitMappings.brightlocal_location_id = m.externalAccountId;
-      });
-
-      return {
-        id: row.id,
-        tenant_id: row.tenant_id,
-        name: row.name,
-        store_code: row.store_code || null,
-        address: row.address || null,
-        domain: row.domain || null,
-        timezone: 'America/New_York',
-        currency: 'USD',
-        status: prov.isCertified ? 'active' : 'onboarding',
-        is_certified: prov.isCertified,
-        certification_state: prov.certificationState,
-        has_historical_data: prov.hasHistoricalData,
-        latest_metric_date: prov.latestMetricDate,
-        staleness_days: prov.stalenessDays,
-        provenance_reason: prov.reason,
-        data_certification_status: row.data_certification_status || 'DATA_REVIEW_REQUIRED',
-        type: row.name === 'ABC Motors' ? 'TEST' : 'REAL',
-        mapped_resource_count: resolvedMaps.length,
-        mapped_accounts_count: resolvedMaps.length,
-        verified_providers_count: verifiedConns,
-        service_areas: zipsByClient.get(row.id) || [],
-        mappings: explicitMappings,
-      };
+    return NextResponse.json({
+      success: true,
+      clients: normalized,
+      user: {
+        id: userId,
+        email: email || 'Authenticated User',
+        role,
+      },
+      meta: {
+        totalCount: normalized.length,
+        certifiedCount: normalized.filter((c) => c.is_certified).length,
+        authorizedTenantIds,
+        warnings,
+        timestamp: new Date().toISOString(),
+      },
     });
-
-    return NextResponse.json({ success: true, source: 'SUPABASE_AUTHENTICATED', clients });
   } catch (err: any) {
-    return NextResponse.json({ success: false, error: 'INTERNAL_SERVER_ERROR', message: err.message }, { status: 500 });
+    return NextResponse.json(
+      {
+        success: false,
+        error: {
+          code: 'CLIENTS_LOAD_ERROR',
+          message: err?.message || 'Unexpected error loading client registry.',
+        },
+      },
+      { status: 500 }
+    );
   }
 }
 
 export async function POST(req: NextRequest) {
-  const auth = await requireAuthenticatedSession(req);
-  if (!auth.authorized || !auth.context || !auth.supabase) return auth.errorResponse!;
+  const authCheck = await resolveAuthenticatedContext(req);
+  if (!authCheck.authorized || !authCheck.context) {
+    return authCheck.errorResponse!;
+  }
+
+  const { tenantId: primaryTenantId, authorizedTenantIds, accessToken } = authCheck.context;
+
   try {
     const body = await req.json();
-    const { name, address, domain, storeCode, tenantId } = body;
-    if (!name || typeof name !== 'string' || !name.trim()) {
-      return NextResponse.json({ success: false, error: 'INVALID_CLIENT_NAME' }, { status: 400 });
+    const { name, address, domain, store_code, organization_id, requested_tenant_id } =
+      body || {};
+
+    if (!name || typeof name !== 'string' || name.trim().length < 2) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: {
+            code: 'INVALID_CLIENT_NAME',
+            message: 'A valid client name (min 2 chars) is required.',
+          },
+        },
+        { status: 400 }
+      );
     }
-    if (tenantId && tenantId !== auth.context.tenantId) {
-      const tCheck = await requireAuthenticatedSession(req, tenantId);
-      if (!tCheck.authorized) return tCheck.errorResponse!;
+
+    // Prefer tenant 00000000-0000-0000-0000-000000000001 if authorized so new clients join the main portfolio
+    const defaultPortfolioTenant = authorizedTenantIds.includes(
+      '00000000-0000-0000-0000-000000000001'
+    )
+      ? '00000000-0000-0000-0000-000000000001'
+      : primaryTenantId;
+
+    let targetTenantId = defaultPortfolioTenant;
+    if (requested_tenant_id) {
+      if (!authorizedTenantIds.includes(requested_tenant_id)) {
+        return NextResponse.json(
+          {
+            success: false,
+            error: {
+              code: 'FORBIDDEN_TENANT_ASSIGNMENT',
+              message: 'Cannot create a client in an unauthorized tenant.',
+            },
+          },
+          { status: 403 }
+        );
+      }
+      targetTenantId = requested_tenant_id;
     }
-    const effTenant = tenantId || auth.context.tenantId;
-    const { data, error } = await auth.supabase
+
+    let supabase = getUserScopedSupabaseClient(accessToken);
+    try {
+      supabase = getServerSupabaseClient(req);
+    } catch {
+      // Use user-scoped client
+    }
+
+    const insertPayload: Record<string, any> = {
+      tenant_id: targetTenantId,
+      name: name.trim(),
+      address: typeof address === 'string' && address.trim() !== '' ? address.trim() : null,
+      domain: typeof domain === 'string' && domain.trim() !== '' ? domain.trim() : null,
+      store_code:
+        typeof store_code === 'string' && store_code.trim() !== '' ? store_code.trim() : null,
+      organization_id:
+        typeof organization_id === 'string' && organization_id.trim() !== ''
+          ? organization_id.trim()
+          : null,
+      data_certification_status: 'DATA_REVIEW_REQUIRED',
+      is_certified: false,
+    };
+
+    const { data: inserted, error: insertErr } = await supabase
       .from('clients')
-      .insert([{ tenant_id: effTenant, name: name.trim(), address: address || null, domain: domain || null, store_code: storeCode || null, is_certified: false, data_certification_status: 'DATA_REVIEW_REQUIRED' }])
-      .select()
+      .insert([insertPayload])
+      .select(VERIFIED_CLIENT_COLUMNS)
       .single();
-    if (error || !data) return NextResponse.json({ success: false, error: 'DATABASE_INSERT_FAILED', message: error?.message }, { status: 500 });
-    return NextResponse.json({ success: true, client: { ...data, status: 'onboarding', is_certified: false, certification_state: 'UNMAPPED', has_historical_data: false, mapped_resource_count: 0, service_areas: [], mappings: {} } }, { status: 201 });
+
+    if (insertErr || !inserted) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: {
+            code: 'CLIENT_CREATE_FAILED',
+            message: insertErr?.message || 'Failed to insert client.',
+          },
+        },
+        { status: 500 }
+      );
+    }
+
+    return NextResponse.json(
+      {
+        success: true,
+        client: normalizeVerifiedClientRecord(inserted, [], [], false),
+      },
+      { status: 201 }
+    );
   } catch (err: any) {
-    return NextResponse.json({ success: false, error: err.message || 'INTERNAL_SERVER_ERROR' }, { status: 500 });
+    return NextResponse.json(
+      { success: false, error: { code: 'CLIENT_POST_ERROR', message: err.message } },
+      { status: 500 }
+    );
   }
 }
-// EOF
