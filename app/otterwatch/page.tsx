@@ -3,7 +3,6 @@
 import React, { useState, useEffect, Suspense } from 'react';
 import Link from 'next/link';
 import { useClient } from '../../lib/client-context';
-import GlobalHeader from '../../components/navigation/GlobalHeader';
 import TrustCertificationStrip, {
   DataTrustState,
 } from '../../components/design-system/TrustCertificationStrip';
@@ -16,33 +15,9 @@ import TriPartInsightCard from '../../components/design-system/TriPartInsightCar
 
 export const dynamic = 'force-dynamic';
 
-interface SerpScanPayload {
-  keyword: string | null;
-  scanTimestamp: string | null;
-  isVerifiedScan: boolean;
-  avgGridRank: number | null;
-  prevAvgGridRank: number | null;
-  shareOfVoice: number | null;
-  prevShareOfVoice: number | null;
-  top3NodeCount: number | null;
-  nodes: GeoGridNode[];
-  trackedKeywords: {
-    keyword: string;
-    avgRank: number | null;
-    top3Nodes: number | null;
-    lastScanAt: string | null;
-  }[];
-  competitors: {
-    name: string;
-    avgRank: number;
-    sovPercent: number;
-    reviewCount?: number;
-  }[];
-}
-
 function OtterWatchLocalSearchContent() {
-  const { activeClient, isLoading: clientsLoading } = useClient();
-  const [scanData, setScanData] = useState<SerpScanPayload | null>(null);
+  const { activeClient, isLoading: clientsLoading, reportingPeriod } = useClient();
+  const [scanData, setScanData] = useState<any | null>(null);
   const [loading, setLoading] = useState<boolean>(false);
 
   const isCertified = Boolean(activeClient?.is_certified);
@@ -89,9 +64,6 @@ function OtterWatchLocalSearchContent() {
               trackedKeywords: Array.isArray(data.metrics.tracked_keywords)
                 ? data.metrics.tracked_keywords
                 : [],
-              competitors: Array.isArray(data.metrics.competitors)
-                ? data.metrics.competitors
-                : [],
             });
           } else {
             setScanData(null);
@@ -110,7 +82,9 @@ function OtterWatchLocalSearchContent() {
     };
   }, [activeClient?.id]);
 
-  const isVerifiedScan = Boolean(isCertified && scanData?.isVerifiedScan && scanData?.keyword);
+  const isVerifiedScan = Boolean(
+    isCertified && scanData?.isVerifiedScan && scanData?.keyword
+  );
 
   const trustState: DataTrustState = loading
     ? 'SECTION_LOADING'
@@ -121,32 +95,33 @@ function OtterWatchLocalSearchContent() {
     : 'UNMAPPED_SETUP';
 
   return (
-    <div className="flex-1 flex flex-col">
+    <div className="flex-1 flex flex-col bg-[#F4F7FB] text-[#0B1F3A]">
       <TrustCertificationStrip
         client={activeClient}
         trustState={trustState}
         lastIngestedAt={scanData?.scanTimestamp}
         recordCount={isVerifiedScan ? 25 : 0}
+        reportingPeriod={reportingPeriod}
       />
 
-      <main className="flex-1 p-6 max-w-[1600px] w-full mx-auto space-y-6 text-white font-sans">
+      <main className="flex-1 p-6 max-w-[1600px] w-full mx-auto space-y-6 font-sans">
         {/* Page Header */}
-        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-[#111622] border border-[#A9C7E5]/15 rounded-xl p-6">
+        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-white border border-[#DCE5EF] rounded-xl p-6 shadow-sm">
           <div>
-            <span className="font-mono text-xs uppercase tracking-widest text-[#D99614] font-bold block">
+            <span className="text-xs uppercase tracking-wider text-[#D99614] font-bold block">
               FLAGSHIP SERP TELEMETRY ENGINE • 5×5 GEOGRAPHIC COORDINATE MATRIX
             </span>
-            <h1 className="text-2xl font-bold tracking-tight text-white mt-1">
+            <h1 className="text-2xl font-extrabold tracking-tight text-[#0B1F3A] mt-1">
               OtterWatch Local Search Intelligence
             </h1>
-            <p className="text-sm text-slate-400 mt-1">
+            <p className="text-sm text-slate-600 mt-1">
               {clientsLoading
                 ? 'Loading client territory...'
                 : activeClient
-                ? `${activeClient.name} • Location: ${
+                ? `${activeClient.name} • Anchor: ${
                     activeClient.address || 'Address pending'
                   } • Store Code: ${activeClient.store_code || 'Unassigned'}`
-                : 'Select an authorized client to inspect 5×5 geo-grid rankings.'}
+                : 'Select an authorized client from the top header to inspect 5×5 geo-grid rankings.'}
             </p>
           </div>
 
@@ -154,9 +129,9 @@ function OtterWatchLocalSearchContent() {
             {activeClient && (
               <Link
                 href={`/connection-center?clientId=${activeClient.id}`}
-                className="px-4 py-2 bg-[#151D2A] hover:bg-[#1C273A] border border-[#A9C7E5]/20 rounded-lg text-xs font-semibold text-slate-200 transition-all"
+                className="px-4 py-2 bg-[#0B1F3A] hover:bg-[#16325B] text-white rounded-lg text-xs font-bold transition-all shadow-sm"
               >
-                Configure SERP & GBP Mapping
+                Configure SERP & GBP Mapping →
               </Link>
             )}
           </div>
@@ -170,11 +145,12 @@ function OtterWatchLocalSearchContent() {
             previousValue={scanData?.prevAvgGridRank}
             format="rank"
             invertDeltaPolarity={true}
-            sourceBadge={isVerifiedScan ? 'SERP • VERIFIED' : 'NO SCAN'}
+            sourceBadge={isVerifiedScan ? 'SERP • VERIFIED' : 'UNSCANNED'}
             provenanceNote={scanData?.keyword ? `Query: ${scanData.keyword}` : 'Unconfigured'}
             isCertified={isVerifiedScan}
             isLoading={loading}
             accentHighlight={true}
+            accentColor="gold"
           />
 
           <KpiMetricCard
@@ -182,20 +158,22 @@ function OtterWatchLocalSearchContent() {
             value={scanData?.shareOfVoice}
             previousValue={scanData?.prevShareOfVoice}
             format="percent"
-            sourceBadge={isVerifiedScan ? '25 NODES' : 'NO SCAN'}
+            sourceBadge={isVerifiedScan ? '25 NODES' : 'UNSCANNED'}
             provenanceNote="Top-3 Map Pack Density"
             isCertified={isVerifiedScan}
             isLoading={loading}
+            accentColor="blue"
           />
 
           <KpiMetricCard
             label="Top-3 Map Pack Nodes"
             value={scanData?.top3NodeCount}
             format="number"
-            sourceBadge={isVerifiedScan ? 'OUT OF 25' : 'NO SCAN'}
+            sourceBadge={isVerifiedScan ? 'OUT OF 25' : 'UNSCANNED'}
             provenanceNote="Rank #1–#3 Coordinates"
             isCertified={isVerifiedScan}
             isLoading={loading}
+            accentColor="teal"
           />
 
           <KpiMetricCard
@@ -206,20 +184,22 @@ function OtterWatchLocalSearchContent() {
             provenanceNote="Active SERP Queries"
             isCertified={isVerifiedScan}
             isLoading={loading}
+            accentColor="violet"
           />
         </div>
 
         {/* Tier 3: Flagship 5x5 Geo-Grid Matrix & Node Inspector */}
         <GeoGridMatrix
+          clientId={activeClient?.id}
           clientName={activeClient?.name || 'Selected Client'}
           centerAddress={activeClient?.address}
           keyword={scanData?.keyword || null}
           scanTimestamp={scanData?.scanTimestamp || null}
           isVerifiedScan={isVerifiedScan}
-          nodes={scanData?.nodes || []}
+          nodes={(scanData?.nodes as GeoGridNode[]) || []}
         />
 
-        {/* Tier 4: Tri-Part Executive Insight ("What / Why / Next") */}
+        {/* Tier 4: Tri-Part Executive Insight */}
         <TriPartInsightCard
           title="Local Pack Territory Coverage & Proximity Assessment"
           category="OTTERWATCH GEO-GRID DIAGNOSTIC"
@@ -236,7 +216,7 @@ function OtterWatchLocalSearchContent() {
           }
           whyItIsHappening={
             isVerifiedScan
-              ? 'Outer-ring coordinate nodes (>2.5 miles from primary address) experience proximity decay against competitors closer to adjacent ZIP centroids.'
+              ? 'Outer-ring coordinate nodes experience proximity decay against competitors closer to adjacent ZIP centroids.'
               : 'BrightLocal / SerpAPI location resource or tracked keyword library has not yet executed an initial verified scan.'
           }
           whatToDoNext={
@@ -244,7 +224,9 @@ function OtterWatchLocalSearchContent() {
               ? 'Reinforce secondary GBP categories and deploy localized Google Ads location extensions in outer-ring quadrants where rank > #3.'
               : 'Map the verified GBP location and SERP provider in Connection Center to activate automated 5×5 coordinate tracking.'
           }
-          actionLabel={isVerifiedScan ? 'Model Impact in Opportunity Lab' : 'Open Connection Center'}
+          actionLabel={
+            isVerifiedScan ? 'Model Impact in Opportunity Lab' : 'Open Connection Center'
+          }
           actionHref={
             isVerifiedScan
               ? `/outcome-lab?clientId=${activeClient?.id || ''}`
@@ -258,13 +240,10 @@ function OtterWatchLocalSearchContent() {
 
 export default function OtterWatchPage() {
   return (
-    <div className="min-h-screen bg-[#0B0F17] text-white flex flex-col font-sans">
-      <Suspense fallback={<div className="p-6 text-xs text-slate-400">Loading Header...</div>}>
-        <GlobalHeader />
-      </Suspense>
-      <Suspense fallback={<div className="p-6 text-xs text-slate-400">Loading OtterWatch...</div>}>
-        <OtterWatchLocalSearchContent />
-      </Suspense>
-    </div>
+    <Suspense
+      fallback={<div className="p-6 text-xs text-slate-500">Loading OtterWatch...</div>}
+    >
+      <OtterWatchLocalSearchContent />
+    </Suspense>
   );
 }
