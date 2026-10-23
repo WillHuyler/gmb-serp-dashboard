@@ -1,119 +1,208 @@
 'use client';
 
-import React, { Suspense } from 'react';
+import React, { useState, useEffect, Suspense } from 'react';
+import Link from 'next/link';
 import { useClient } from '../../lib/client-context';
 import GlobalHeader from '../../components/navigation/GlobalHeader';
+import TrustCertificationStrip, {
+  DataTrustState,
+} from '../../components/design-system/TrustCertificationStrip';
+import KpiMetricCard from '../../components/design-system/KpiMetricCard';
+import TriPartInsightCard from '../../components/design-system/TriPartInsightCard';
 
 export const dynamic = 'force-dynamic';
 
 function CompetitorsContent() {
   const { activeClient } = useClient();
-  const hasSerpData = Boolean(activeClient?.mappings?.brightlocal_location_id);
+  const [metrics, setMetrics] = useState<any | null>(null);
+  const [loading, setLoading] = useState(false);
+
+  const isCertified = Boolean(activeClient?.is_certified);
+
+  useEffect(() => {
+    if (!activeClient?.id) {
+      setMetrics(null);
+      return;
+    }
+
+    let cancelled = false;
+    async function loadCompetitors() {
+      setLoading(true);
+      try {
+        const res = await fetch(
+          `/api/telemetry/aggregate?clientId=${encodeURIComponent(activeClient!.id)}`,
+          { credentials: 'include', headers: { 'Cache-Control': 'no-cache' } }
+        );
+        const data = await res.json();
+        if (!cancelled) {
+          setMetrics(res.ok && data.success ? data.metrics : null);
+        }
+      } catch {
+        if (!cancelled) setMetrics(null);
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    }
+
+    loadCompetitors();
+    return () => {
+      cancelled = true;
+    };
+  }, [activeClient?.id]);
+
+  const competitorsList: any[] =
+    isCertified && Array.isArray(metrics?.competitors) ? metrics.competitors : [];
+  const hasVerifiedCompetitors = competitorsList.length > 0;
+
+  const trustState: DataTrustState = loading
+    ? 'SECTION_LOADING'
+    : hasVerifiedCompetitors
+    ? 'CERTIFIED_LIVE'
+    : activeClient?.mappings?.brightlocal_location_id
+    ? 'MAPPED_PENDING_SYNC'
+    : 'UNMAPPED_SETUP';
 
   return (
-    <main className="flex-1 p-8 space-y-6 max-w-7xl w-full mx-auto font-sans">
-      <div className="flex justify-between items-center border-b border-[#A9C7E5]/10 pb-6">
-        <div>
-          <span className="text-[10px] font-mono uppercase tracking-widest text-[#D99614] font-bold block">
-            LOCAL COMPETITIVE OVERLAP & SHARE OF VOICE
-          </span>
-          <h1 className="text-2xl font-bold tracking-tight text-white mt-1">
-            {activeClient?.name || 'Active Client'}
-          </h1>
-          <p className="text-xs text-slate-400 mt-1 font-mono">
-            SERP Node Observation Source: {activeClient?.mappings?.brightlocal_location_id || 'UNMAPPED'}
-          </p>
-        </div>
+    <div className="flex-1 flex flex-col">
+      <TrustCertificationStrip
+        client={activeClient}
+        trustState={trustState}
+        lastIngestedAt={metrics?.last_ingested_at}
+        recordCount={competitorsList.length}
+      />
 
-        <span className={`px-3 py-1 rounded text-xs font-mono font-bold border ${
-          hasSerpData
-            ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'
-            : 'bg-slate-800 text-slate-400 border-slate-700'
-        }`}>
-          {hasSerpData ? 'COMPETITOR TELEMETRY ACTIVE ✓' : 'NO SERP LOCATION MAPPED'}
-        </span>
-      </div>
-
-      {!hasSerpData ? (
-        <div className="bg-[#111622] border border-[#A9C7E5]/10 rounded-xl p-12 text-center space-y-4 max-w-xl mx-auto mt-12">
-          <div className="w-12 h-12 bg-slate-800 rounded-full flex items-center justify-center mx-auto text-xl">
-            ⚔️
-          </div>
+      <main className="flex-1 p-6 max-w-[1600px] w-full mx-auto space-y-6 text-white font-sans">
+        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-[#111622] border border-[#A9C7E5]/15 rounded-xl p-6">
           <div>
-            <h3 className="text-sm font-bold font-mono text-white uppercase tracking-wider">
-              NO COMPETITOR SERP TELEMETRY SOURCED
-            </h3>
-            <p className="text-xs text-slate-400 mt-1 font-mono">
-              Competitive node overlap generates directly from active OtterWatch 5x5 geo-grid scans. Map a location ID for <strong className="text-white">{activeClient?.name}</strong> to view competitors.
+            <span className="font-mono text-xs uppercase tracking-widest text-[#D99614] font-bold block">
+              KEYWORD-BOUND SERP DISPLACEMENT MATRIX
+            </span>
+            <h1 className="text-2xl font-bold tracking-tight text-white mt-1">
+              Competitive Overlap — {activeClient?.name || 'Select Client'}
+            </h1>
+            <p className="text-sm text-slate-400 mt-1">
+              Tracks real local businesses competing across the same 25 geo-grid coordinates and target keywords. Zero hardcoded competitor fixtures.
             </p>
           </div>
-          <a
-            href="/connection-center"
-            className="inline-block bg-[#55A9E6]/10 border border-[#55A9E6]/30 text-[#55A9E6] text-xs font-mono font-bold px-4 py-2 rounded hover:bg-[#55A9E6]/20 transition-all"
+
+          <Link
+            href={`/otterwatch?clientId=${activeClient?.id || ''}`}
+            className="px-4 py-2 bg-[#D99614] hover:bg-[#B97A08] text-[#0B0F17] font-semibold text-xs rounded-lg"
           >
-            Configure Location Mapping →
-          </a>
+            Inspect 5×5 Geo-Grid →
+          </Link>
         </div>
-      ) : (
-        <div className="bg-[#111622] border border-[#A9C7E5]/10 rounded-xl p-6 space-y-6">
-          <div className="flex justify-between items-center border-b border-[#A9C7E5]/10 pb-4">
-            <h3 className="text-xs font-mono font-bold text-white uppercase tracking-wider">
-              LOCAL MAP PACK COMPETITOR OVERLAP MATRIX
+
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          <KpiMetricCard
+            label="Client Share of Voice"
+            value={metrics?.share_of_voice ?? null}
+            format="percent"
+            sourceBadge="OTTERWATCH SOV"
+            provenanceNote="25-Node Map Pack Share"
+            isCertified={hasVerifiedCompetitors}
+            isLoading={loading}
+            accentHighlight={true}
+          />
+
+          <KpiMetricCard
+            label="Client Weighted Avg Rank"
+            value={metrics?.avg_map_rank ?? null}
+            format="rank"
+            invertDeltaPolarity={true}
+            sourceBadge="5×5 GRID"
+            provenanceNote="Across Scanned Nodes"
+            isCertified={hasVerifiedCompetitors}
+            isLoading={loading}
+          />
+
+          <KpiMetricCard
+            label="Observed SERP Competitors"
+            value={hasVerifiedCompetitors ? competitorsList.length : null}
+            format="number"
+            sourceBadge="SERP OBSERVATIONS"
+            provenanceNote="Verified Local Contenders"
+            isCertified={hasVerifiedCompetitors}
+            isLoading={loading}
+          />
+        </div>
+
+        <div className="bg-[#111622] border border-[#A9C7E5]/15 rounded-xl p-5 space-y-4">
+          <div className="border-b border-[#A9C7E5]/10 pb-3 flex items-center justify-between">
+            <h3 className="text-base font-bold text-white">
+              Observed Map Pack Competitors ({activeClient?.name || 'Client'})
             </h3>
-            <span className="text-xs font-mono text-slate-400">
-              Sourced from location {activeClient?.mappings?.brightlocal_location_id}
+            <span className="font-mono text-xs text-slate-400">
+              SOURCE: PUBLIC.KEYWORD_RANKINGS / RANK_HISTORY
             </span>
           </div>
 
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-xs font-mono">
-              <thead>
-                <tr className="border-b border-[#A9C7E5]/10 text-slate-400 text-[10px] uppercase">
-                  <th className="pb-3">COMPETITOR BUSINESS NAME</th>
-                  <th className="pb-3">SHARE OF VOICE</th>
-                  <th className="pb-3">AVG GRID RANK</th>
-                  <th className="pb-3">TOP OVERLAP KEYWORD</th>
-                  <th className="pb-3">MOVEMENT</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-[#A9C7E5]/10 text-slate-200">
-                <tr>
-                  <td className="py-3 font-bold text-white">Metro Auto Mall</td>
-                  <td className="py-3 text-emerald-400">34.2%</td>
-                  <td className="py-3 font-bold">#1.8</td>
-                  <td className="py-3 text-slate-400">used cars near me</td>
-                  <td className="py-3 text-emerald-400">↑ 1.2</td>
-                </tr>
-                <tr>
-                  <td className="py-3 font-bold text-white">Northside Ford</td>
-                  <td className="py-3 text-blue-400">28.6%</td>
-                  <td className="py-3 font-bold">#2.4</td>
-                  <td className="py-3 text-slate-400">car dealership milwaukee</td>
-                  <td className="py-3 text-slate-400">0.0</td>
-                </tr>
-                <tr>
-                  <td className="py-3 font-bold text-white">FastLane Auto Repair</td>
-                  <td className="py-3 text-amber-400">18.1%</td>
-                  <td className="py-3 font-bold">#4.1</td>
-                  <td className="py-3 text-slate-400">auto repair service 53202</td>
-                  <td className="py-3 text-amber-400">↓ 0.8</td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
+          {!hasVerifiedCompetitors ? (
+            <div className="p-8 text-center bg-[#151D2A] rounded-xl border border-[#A9C7E5]/10 space-y-2">
+              <p className="text-sm font-bold text-white">
+                No Verified Competitor SERP Observations Recorded
+              </p>
+              <p className="text-xs text-slate-400 max-w-lg mx-auto">
+                Per CR-007, PorchLight never renders hardcoded competitor names or synthetic Share-of-Voice percentages. Execute a verified 5×5 SERP scan for {activeClient?.name || 'this client'} to populate observed local pack competitors.
+              </p>
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-left border-collapse text-xs">
+                <thead>
+                  <tr className="border-b border-[#A9C7E5]/10 text-slate-400 font-mono text-[10px] uppercase">
+                    <th className="py-2.5 px-3">Business Name</th>
+                    <th className="py-2.5 px-3">Observed Avg Rank</th>
+                    <th className="py-2.5 px-3">Grid Share of Voice</th>
+                    <th className="py-2.5 px-3 text-right">Verified Reviews</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-[#A9C7E5]/10">
+                  {competitorsList.map((comp: any, idx: number) => (
+                    <tr key={comp.name || idx} className="hover:bg-[#151D2A]/60">
+                      <td className="py-3 px-3 font-semibold text-white">{comp.name}</td>
+                      <td className="py-3 px-3 font-mono text-[#D99614]">
+                        #{Number(comp.avgRank || 0).toFixed(1)}
+                      </td>
+                      <td className="py-3 px-3 font-mono text-slate-200">
+                        {Number(comp.sovPercent || 0).toFixed(1)}%
+                      </td>
+                      <td className="py-3 px-3 text-right font-mono text-slate-300">
+                        {comp.reviewCount ?? '—'}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
         </div>
-      )}
-    </main>
+
+        <TriPartInsightCard
+          title="Competitive Displacement & Map Pack Share Strategy"
+          category="COMPETITIVE INTELLIGENCE"
+          confidence={hasVerifiedCompetitors ? 'HIGH' : 'INSUFFICIENT_DATA'}
+          sources={hasVerifiedCompetitors ? ['OTTERWATCH_SERP_GRID'] : []}
+          whatIsHappening={
+            hasVerifiedCompetitors
+              ? `${competitorsList.length} verified local businesses were observed competing across ${activeClient?.name}'s target geo-grid.`
+              : `Competitor discovery awaits an initial verified SERP scan for ${activeClient?.name || 'this client'}.`
+          }
+          whyItIsHappening="Map Pack displacement in outer grid nodes is driven by competitor proximity to peripheral ZIP centroids and category-specific review velocity."
+          whatToDoNext="Use OtterWatch node inspection to identify which specific quadrants are lost to top displacers, then target those ZIPs with localized ad extensions."
+        />
+      </main>
+    </div>
   );
 }
 
 export default function CompetitorsPage() {
   return (
     <div className="min-h-screen bg-[#0B0F17] text-white flex flex-col font-sans">
-      <Suspense fallback={<div className="p-6 text-xs text-slate-400 font-mono">Loading Header...</div>}>
+      <Suspense fallback={<div className="p-6 text-xs text-slate-400">Loading Header...</div>}>
         <GlobalHeader />
       </Suspense>
-      <Suspense fallback={<div className="p-6 text-xs text-slate-400 font-mono">Loading Competitor Workspace...</div>}>
+      <Suspense fallback={<div className="p-6 text-xs text-slate-400">Loading Competitors...</div>}>
         <CompetitorsContent />
       </Suspense>
     </div>
