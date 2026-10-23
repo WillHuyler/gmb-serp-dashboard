@@ -1,485 +1,383 @@
 'use client';
 
 import React, { useState, Suspense } from 'react';
+import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useClient, ClientProfile } from '../../lib/client-context';
-import GlobalHeader from '../../components/navigation/GlobalHeader';
+import TrustCertificationStrip from '../../components/design-system/TrustCertificationStrip';
 
 export const dynamic = 'force-dynamic';
 
-function ClientPortfolioContent() {
+function ClientsPortfolioContent() {
   const router = useRouter();
-  const { activeClient, setActiveClient, clientRegistry, isLoading, error, refreshClients } = useClient();
+  const {
+    clientRegistry,
+    activeClient,
+    setActiveClient,
+    isLoading,
+    registryState,
+    refreshClients,
+  } = useClient();
 
   const [searchQuery, setSearchQuery] = useState('');
-  const [statusFilter, setStatusFilter] = useState<'ALL' | 'CERTIFIED' | 'UNMAPPED'>('ALL');
-
-  const [showAddModal, setShowAddModal] = useState(false);
-  const [newName, setNewName] = useState('');
-  const [newDomain, setNewDomain] = useState('');
-  const [newTimezone, setNewTimezone] = useState('America/New_York');
-  const [newCurrency, setNewCurrency] = useState('USD');
-  const [submitting, setSubmitting] = useState(false);
+  const [filterMode, setFilterMode] = useState<'ALL' | 'CERTIFIED' | 'UNCERTIFIED'>('ALL');
+  const [modalOpen, setModalOpen] = useState(false);
+  const [editingClient, setEditingClient] = useState<ClientProfile | null>(null);
+  const [formName, setFormName] = useState('');
+  const [formAddress, setFormAddress] = useState('');
+  const [formDomain, setFormDomain] = useState('');
+  const [formStoreCode, setFormStoreCode] = useState('');
+  const [saving, setSaving] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
 
-  const [editingClient, setEditingClient] = useState<ClientProfile | null>(null);
-  const [editName, setEditName] = useState('');
-  const [editDomain, setEditDomain] = useState('');
-  const [editTimezone, setEditTimezone] = useState('America/New_York');
-  const [editCurrency, setEditCurrency] = useState('USD');
-
-  const filteredClients = clientRegistry.filter((client) => {
+  const filteredClients = clientRegistry.filter((c) => {
     const matchesSearch =
-      client.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      (client.domain || '').toLowerCase().includes(searchQuery.toLowerCase());
-
+      c.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (c.address || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (c.store_code || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (c.domain || '').toLowerCase().includes(searchQuery.toLowerCase());
     if (!matchesSearch) return false;
-    if (statusFilter === 'CERTIFIED') return client.is_certified;
-    if (statusFilter === 'UNMAPPED') return !client.is_certified;
+    if (filterMode === 'CERTIFIED') return c.is_certified;
+    if (filterMode === 'UNCERTIFIED') return !c.is_certified;
     return true;
   });
 
-  const handleCreateClient = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const openCreateModal = () => {
+    setEditingClient(null);
+    setFormName('');
+    setFormAddress('');
+    setFormDomain('');
+    setFormStoreCode('');
     setFormError(null);
-    setSubmitting(true);
-
-    try {
-      const res = await fetch('/api/clients', {
-        method: 'POST',
-        credentials: 'include',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          name: newName.trim(),
-          domain: newDomain.trim() || null,
-          timezone: newTimezone.trim() || 'America/New_York',
-          currency: newCurrency.trim() || 'USD',
-        }),
-      });
-
-      const data = await res.json();
-      if (!res.ok || !data.success) {
-        setFormError(data?.error?.message || 'Failed to create client.');
-        setSubmitting(false);
-        return;
-      }
-
-      await refreshClients();
-      setActiveClient(data.client);
-      setShowAddModal(false);
-      setNewName('');
-      setNewDomain('');
-    } catch (err: any) {
-      setFormError(err?.message || 'Unexpected error creating client.');
-    } finally {
-      setSubmitting(false);
-    }
+    setModalOpen(true);
   };
 
-  const openEditDrawer = (client: ClientProfile) => {
+  const openEditModal = (client: ClientProfile) => {
     setEditingClient(client);
-    setEditName(client.name);
-    setEditDomain(client.domain || '');
-    setEditTimezone(client.timezone || 'America/New_York');
-    setEditCurrency(client.currency || 'USD');
+    setFormName(client.name || '');
+    setFormAddress(client.address || '');
+    setFormDomain(client.domain || '');
+    setFormStoreCode(client.store_code || '');
     setFormError(null);
+    setModalOpen(true);
   };
 
-  const handleUpdateClient = async (e: React.FormEvent) => {
+  const handleSaveClient = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!editingClient) return;
+    setSaving(true);
     setFormError(null);
-    setSubmitting(true);
 
     try {
-      const res = await fetch(`/api/clients/${editingClient.id}`, {
-        method: 'PATCH',
+      const endpoint = editingClient ? `/api/clients/${editingClient.id}` : '/api/clients';
+      const method = editingClient ? 'PATCH' : 'POST';
+
+      const res = await fetch(endpoint, {
+        method,
         credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          name: editName.trim(),
-          domain: editDomain.trim() || null,
-          timezone: editTimezone.trim(),
-          currency: editCurrency.trim(),
+          name: formName.trim(),
+          address: formAddress.trim() || null,
+          domain: formDomain.trim() || null,
+          store_code: formStoreCode.trim() || null,
         }),
       });
 
       const data = await res.json();
       if (!res.ok || !data.success) {
-        setFormError(data?.error?.message || 'Failed to update client.');
-        setSubmitting(false);
+        setFormError(data?.error?.message || 'Failed to save client record.');
         return;
       }
 
       await refreshClients();
-      if (activeClient?.id === editingClient.id) {
+      if (data.client) {
         setActiveClient(data.client);
       }
-      setEditingClient(null);
+      setModalOpen(false);
     } catch (err: any) {
-      setFormError(err?.message || 'Unexpected error updating client.');
+      setFormError(err?.message || 'Network error while saving client.');
     } finally {
-      setSubmitting(false);
+      setSaving(false);
     }
-  };
-
-  const selectAndNavigate = (client: ClientProfile, destination: string) => {
-    setActiveClient(client);
-    router.push(`${destination}?clientId=${client.id}`);
   };
 
   return (
-    <main className="flex-1 p-6 max-w-7xl w-full mx-auto space-y-6 text-white font-sans">
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-[#111622] border border-[#A9C7E5]/15 rounded-xl p-6">
-        <div>
-          <span className="text-xs font-mono uppercase tracking-widest text-[#D99614] font-semibold block">
-            AGENCY PORTFOLIO • AUTHORITATIVE CLIENT REGISTRY
-          </span>
-          <h1 className="text-2xl font-bold tracking-tight text-white mt-1">Client Portfolio</h1>
-          <p className="text-sm text-slate-400 mt-1">
-            Manage client profiles, domains, provider resource mappings, and data certification status.
-          </p>
+    <div className="flex-1 flex flex-col bg-[#F4F7FB] text-[#0B1F3A]">
+      <TrustCertificationStrip
+        client={activeClient}
+        trustState={activeClient?.is_certified ? 'CERTIFIED_LIVE' : 'UNMAPPED_SETUP'}
+        recordCount={clientRegistry.length}
+      />
+
+      <main className="flex-1 p-6 max-w-[1600px] w-full mx-auto space-y-6 font-sans">
+        {/* Header */}
+        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-white border border-[#DCE5EF] rounded-xl p-6 shadow-sm">
+          <div>
+            <span className="text-xs uppercase tracking-wider text-[#D99614] font-bold block">
+              MULTI-TENANT AGENCY PORTFOLIO & CLIENT GOVERNANCE
+            </span>
+            <h1 className="text-2xl font-extrabold tracking-tight text-[#0B1F3A] mt-1">
+              Authorized Client Registry ({clientRegistry.length})
+            </h1>
+            <p className="text-sm text-slate-600 mt-1">
+              Manage verified client locations, GBP store codes, domains, and provider mappings across your authorized tenants.
+            </p>
+          </div>
+
+          <div className="flex items-center gap-3">
+            <button
+              type="button"
+              onClick={() => refreshClients()}
+              className="px-4 py-2 bg-[#F4F7FB] hover:bg-slate-200 border border-[#DCE5EF] rounded-lg text-xs font-bold text-[#0B1F3A]"
+            >
+              Refresh Portfolio
+            </button>
+            <button
+              type="button"
+              onClick={openCreateModal}
+              className="px-4 py-2 bg-[#D99614] hover:bg-[#B87D0E] text-[#0B1F3A] font-bold text-xs rounded-lg shadow-sm"
+            >
+              + Add New Client
+            </button>
+          </div>
         </div>
 
-        <div className="flex items-center space-x-3">
-          <button
-            onClick={() => refreshClients()}
-            className="px-3.5 py-2 bg-[#151D2A] hover:bg-[#1C273A] border border-[#A9C7E5]/15 rounded-lg text-xs font-medium text-slate-200 transition-all"
-          >
-            Refresh Registry
-          </button>
-          <button
-            onClick={() => {
-              setFormError(null);
-              setShowAddModal(true);
-            }}
-            className="px-4 py-2 bg-[#D99614] hover:bg-[#B97A08] text-[#0B0F17] font-semibold text-xs rounded-lg transition-all shadow"
-          >
-            + Add New Client
-          </button>
-        </div>
-      </div>
+        {/* Search & Filter Controls */}
+        <div className="bg-white border border-[#DCE5EF] rounded-xl p-4 flex flex-col sm:flex-row items-center justify-between gap-4 shadow-sm">
+          <input
+            type="text"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            placeholder="Search by client name, address, store code, or domain..."
+            className="w-full sm:max-w-md bg-[#F4F7FB] border border-[#DCE5EF] rounded-lg px-3.5 py-2 text-xs text-[#0B1F3A] font-medium focus:outline-none focus:ring-2 focus:ring-[#D99614]"
+          />
 
-      <div className="bg-[#111622] border border-[#A9C7E5]/10 rounded-xl p-4 flex flex-col sm:flex-row justify-between items-center gap-4">
-        <input
-          type="text"
-          value={searchQuery}
-          onChange={(e) => setSearchQuery(e.target.value)}
-          placeholder="Search clients by name or domain..."
-          className="w-full sm:max-w-md bg-[#151D2A] border border-[#A9C7E5]/20 rounded-lg px-3.5 py-2 text-sm text-white focus:outline-none focus:border-[#D99614]"
-        />
-
-        <div className="flex items-center space-x-2 text-xs">
-          <button
-            onClick={() => setStatusFilter('ALL')}
-            className={`px-3 py-1.5 rounded-lg font-medium border ${
-              statusFilter === 'ALL'
-                ? 'bg-[#D99614]/15 text-[#D99614] border-[#D99614]/30'
-                : 'bg-[#151D2A] text-slate-400 border-[#A9C7E5]/10'
-            }`}
-          >
-            All ({clientRegistry.length})
-          </button>
-          <button
-            onClick={() => setStatusFilter('CERTIFIED')}
-            className={`px-3 py-1.5 rounded-lg font-medium border ${
-              statusFilter === 'CERTIFIED'
-                ? 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30'
-                : 'bg-[#151D2A] text-slate-400 border-[#A9C7E5]/10'
-            }`}
-          >
-            Certified ({clientRegistry.filter((c) => c.is_certified).length})
-          </button>
-          <button
-            onClick={() => setStatusFilter('UNMAPPED')}
-            className={`px-3 py-1.5 rounded-lg font-medium border ${
-              statusFilter === 'UNMAPPED'
-                ? 'bg-amber-500/15 text-amber-400 border-amber-500/30'
-                : 'bg-[#151D2A] text-slate-400 border-[#A9C7E5]/10'
-            }`}
-          >
-            Uncertified / Onboarding ({clientRegistry.filter((c) => !c.is_certified).length})
-          </button>
-        </div>
-      </div>
-
-      {isLoading ? (
-        <div className="p-12 rounded-xl bg-[#111622] border border-[#A9C7E5]/10 text-center text-sm text-slate-400">
-          Loading authorized client registry from Supabase...
-        </div>
-      ) : error === 'AUTHENTICATION_REQUIRED' ? (
-        <div className="p-12 rounded-xl bg-[#111622] border border-amber-500/20 text-center space-y-4">
-          <h2 className="text-lg font-bold text-white">Authentication Required</h2>
-          <p className="text-xs text-slate-400 max-w-md mx-auto">
-            Sign in with your authorized agency credentials to view and manage client records.
-          </p>
-          <button
-            onClick={() => router.push('/login')}
-            className="px-4 py-2 bg-[#D99614] text-[#0B0F17] font-semibold text-xs rounded-lg"
-          >
-            Sign In
-          </button>
-        </div>
-      ) : filteredClients.length === 0 ? (
-        <div className="p-12 rounded-xl bg-[#111622] border border-[#A9C7E5]/10 text-center space-y-3">
-          <h3 className="text-base font-bold text-white">No Matching Client Profiles</h3>
-          <p className="text-xs text-slate-400">
-            Create a new client profile or adjust your search filter.
-          </p>
-        </div>
-      ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-          {filteredClients.map((client) => {
-            const isSelected = activeClient?.id === client.id;
-            const mappedCount = client.mapped_resource_count ?? 0;
-
-            return (
-              <div
-                key={client.id}
-                className={`bg-[#111622] rounded-xl p-5 flex flex-col justify-between space-y-4 border transition-all ${
-                  isSelected
-                    ? 'border-[#D99614] shadow-lg shadow-[#D99614]/5'
-                    : 'border-[#A9C7E5]/12 hover:border-[#A9C7E5]/25'
+          <div className="flex items-center gap-2">
+            {(['ALL', 'CERTIFIED', 'UNCERTIFIED'] as const).map((mode) => (
+              <button
+                key={mode}
+                type="button"
+                onClick={() => setFilterMode(mode)}
+                className={`px-3 py-1.5 rounded-lg text-xs font-bold border transition-all ${
+                  filterMode === mode
+                    ? 'bg-[#0B1F3A] text-white border-[#0B1F3A]'
+                    : 'bg-[#F4F7FB] text-slate-600 border-[#DCE5EF]'
                 }`}
               >
-                <div className="space-y-3">
-                  <div className="flex justify-between items-start gap-2">
-                    <div>
-                      <h3 className="text-base font-bold text-white">{client.name}</h3>
-                      <p className="text-xs text-slate-400 mt-0.5">
-                        {client.domain || 'No domain configured'}
-                      </p>
+                {mode}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Client Cards Grid */}
+        {registryState === 'AUTH_REQUIRED' ? (
+          <div className="bg-amber-50 border border-amber-300 rounded-xl p-8 text-center space-y-3">
+            <h3 className="text-base font-bold text-amber-900">
+              Sign In Required to View Your 9 Authorized Clients
+            </h3>
+            <p className="text-xs text-amber-800 max-w-md mx-auto">
+              Authenticate with your administrator credentials so PorchLight can verify your tenant memberships and load your client portfolio.
+            </p>
+            <Link
+              href="/login"
+              className="inline-block px-5 py-2.5 bg-[#0B1F3A] text-white font-bold text-xs rounded-lg"
+            >
+              Sign In Now →
+            </Link>
+          </div>
+        ) : isLoading ? (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {[1, 2, 3, 4, 5, 6].map((n) => (
+              <div
+                key={n}
+                className="h-48 bg-white border border-[#DCE5EF] rounded-xl p-5 animate-pulse"
+              />
+            ))}
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {filteredClients.map((client) => {
+              const isSelected = activeClient?.id === client.id;
+              return (
+                <div
+                  key={client.id}
+                  className={`bg-white rounded-xl p-5 border transition-all flex flex-col justify-between space-y-4 shadow-sm ${
+                    isSelected
+                      ? 'border-2 border-[#D99614] ring-2 ring-[#D99614]/15'
+                      : 'border-[#DCE5EF] hover:border-slate-300'
+                  }`}
+                >
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between gap-2">
+                      <span
+                        className={`font-mono text-[10px] px-2.5 py-0.5 rounded border font-bold ${
+                          client.is_certified
+                            ? 'bg-emerald-50 text-emerald-800 border-emerald-200'
+                            : 'bg-amber-50 text-amber-800 border-amber-200'
+                        }`}
+                      >
+                        {client.is_certified ? '✓ CERTIFIED' : '• SETUP / REVIEW REQUIRED'}
+                      </span>
+                      {client.store_code && (
+                        <span className="font-mono text-[10px] text-slate-500 bg-[#F4F7FB] px-2 py-0.5 rounded border border-[#DCE5EF]">
+                          #{client.store_code}
+                        </span>
+                      )}
                     </div>
-                    <span
-                      className={`text-[11px] font-mono px-2.5 py-0.5 rounded border font-semibold shrink-0 ${
-                        client.is_certified
-                          ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/25'
-                          : 'bg-amber-500/10 text-amber-400 border-amber-500/25'
-                      }`}
-                    >
-                      {client.is_certified ? 'CERTIFIED' : 'UNCERTIFIED'}
-                    </span>
+
+                    <h3 className="text-base font-extrabold text-[#0B1F3A]">{client.name}</h3>
+                    <p className="text-xs text-slate-600">
+                      {client.address || 'Primary address not configured'}
+                    </p>
+                    {client.domain && (
+                      <p className="text-xs font-mono text-sky-700">{client.domain}</p>
+                    )}
                   </div>
 
-                  <div className="pt-2 border-t border-[#A9C7E5]/10 grid grid-cols-2 gap-3 text-xs">
-                    <div>
-                      <span className="text-slate-500 block text-[11px]">Mapped Providers</span>
-                      <span className="text-slate-200 font-mono font-semibold">
-                        {mappedCount} {mappedCount === 1 ? 'Resource' : 'Resources'}
-                      </span>
-                    </div>
-                    <div>
-                      <span className="text-slate-500 block text-[11px]">Timezone / Currency</span>
-                      <span className="text-slate-200 font-mono font-semibold">
-                        {client.timezone || 'America/New_York'} ({client.currency || 'USD'})
-                      </span>
+                  <div className="pt-3 border-t border-[#DCE5EF] flex flex-wrap items-center justify-between gap-2">
+                    <button
+                      type="button"
+                      onClick={() => openEditModal(client)}
+                      className="px-3 py-1.5 bg-[#F4F7FB] hover:bg-slate-200 border border-[#DCE5EF] rounded-lg text-xs font-bold text-[#0B1F3A]"
+                    >
+                      Edit Details
+                    </button>
+
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setActiveClient(client);
+                          router.push(`/connection-center?clientId=${client.id}`);
+                        }}
+                        className="px-3 py-1.5 bg-[#F4F7FB] hover:bg-slate-200 border border-[#DCE5EF] rounded-lg text-xs font-bold text-[#0B1F3A]"
+                      >
+                        Map Providers
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setActiveClient(client);
+                          router.push(`/command-center?clientId=${client.id}`);
+                        }}
+                        className="px-3 py-1.5 bg-[#D99614] hover:bg-[#B87D0E] text-[#0B1F3A] rounded-lg text-xs font-bold"
+                      >
+                        Open →
+                      </button>
                     </div>
                   </div>
                 </div>
+              );
+            })}
+          </div>
+        )}
 
-                <div className="pt-3 border-t border-[#A9C7E5]/10 flex items-center justify-between gap-2">
+        {/* Create / Edit Modal */}
+        {modalOpen && (
+          <div className="fixed inset-0 z-50 bg-[#0B1F3A]/60 backdrop-blur-sm flex items-center justify-center p-4">
+            <div className="bg-white border border-[#DCE5EF] rounded-2xl max-w-lg w-full p-6 space-y-4 shadow-xl">
+              <div className="flex items-center justify-between border-b border-[#DCE5EF] pb-3">
+                <h3 className="text-lg font-extrabold text-[#0B1F3A]">
+                  {editingClient ? `Edit ${editingClient.name}` : 'Create New Client Account'}
+                </h3>
+                <button
+                  type="button"
+                  onClick={() => setModalOpen(false)}
+                  className="text-slate-400 hover:text-slate-700 text-sm font-bold"
+                >
+                  ✕
+                </button>
+              </div>
+
+              {formError && (
+                <div className="p-3 rounded-lg bg-rose-50 border border-rose-200 text-xs text-rose-700 font-semibold">
+                  {formError}
+                </div>
+              )}
+
+              <form onSubmit={handleSaveClient} className="space-y-4 text-xs">
+                <div>
+                  <label className="block font-bold text-[#0B1F3A] mb-1">
+                    Client Business Name *
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={formName}
+                    onChange={(e) => setFormName(e.target.value)}
+                    className="w-full bg-[#F4F7FB] border border-[#DCE5EF] rounded-lg px-3.5 py-2 text-sm text-[#0B1F3A] font-medium"
+                  />
+                </div>
+
+                <div>
+                  <label className="block font-bold text-[#0B1F3A] mb-1">
+                    Primary Street Address
+                  </label>
+                  <input
+                    type="text"
+                    value={formAddress}
+                    onChange={(e) => setFormAddress(e.target.value)}
+                    className="w-full bg-[#F4F7FB] border border-[#DCE5EF] rounded-lg px-3.5 py-2 text-sm text-[#0B1F3A]"
+                  />
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block font-bold text-[#0B1F3A] mb-1">
+                      Website Domain
+                    </label>
+                    <input
+                      type="text"
+                      value={formDomain}
+                      onChange={(e) => setFormDomain(e.target.value)}
+                      placeholder="e.g., example.com"
+                      className="w-full bg-[#F4F7FB] border border-[#DCE5EF] rounded-lg px-3.5 py-2 text-sm text-[#0B1F3A] font-mono"
+                    />
+                  </div>
+                  <div>
+                    <label className="block font-bold text-[#0B1F3A] mb-1">
+                      GBP Store Code
+                    </label>
+                    <input
+                      type="text"
+                      value={formStoreCode}
+                      onChange={(e) => setFormStoreCode(e.target.value)}
+                      placeholder="e.g., 1003001"
+                      className="w-full bg-[#F4F7FB] border border-[#DCE5EF] rounded-lg px-3.5 py-2 text-sm text-[#0B1F3A] font-mono"
+                    />
+                  </div>
+                </div>
+
+                <div className="pt-3 border-t border-[#DCE5EF] flex justify-end gap-2">
                   <button
-                    onClick={() => openEditDrawer(client)}
-                    className="px-3 py-1.5 bg-[#151D2A] hover:bg-[#1C273A] border border-[#A9C7E5]/15 rounded-lg text-xs text-slate-300 font-medium"
+                    type="button"
+                    onClick={() => setModalOpen(false)}
+                    className="px-4 py-2 bg-[#F4F7FB] border border-[#DCE5EF] rounded-lg font-bold text-slate-700"
                   >
-                    Edit Details
+                    Cancel
                   </button>
-
-                  <div className="flex items-center space-x-2">
-                    <button
-                      onClick={() => selectAndNavigate(client, '/connection-center')}
-                      className="px-3 py-1.5 bg-[#151D2A] hover:bg-[#1C273A] border border-[#A9C7E5]/20 rounded-lg text-xs text-slate-200 font-medium"
-                    >
-                      Map Providers
-                    </button>
-                    <button
-                      onClick={() => selectAndNavigate(client, '/command-center')}
-                      className="px-3 py-1.5 bg-[#D99614] hover:bg-[#B97A08] text-[#0B0F17] rounded-lg text-xs font-semibold"
-                    >
-                      Command Center →
-                    </button>
-                  </div>
+                  <button
+                    type="submit"
+                    disabled={saving}
+                    className="px-4 py-2 bg-[#D99614] hover:bg-[#B87D0E] text-[#0B1F3A] font-bold rounded-lg"
+                  >
+                    {saving ? 'Saving...' : editingClient ? 'Save Changes' : 'Create Client'}
+                  </button>
                 </div>
-              </div>
-            );
-          })}
-        </div>
-      )}
-
-      {showAddModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4">
-          <div className="w-full max-w-md bg-[#111622] border border-[#A9C7E5]/20 rounded-xl p-6 space-y-4 shadow-2xl">
-            <div className="flex justify-between items-center border-b border-[#A9C7E5]/10 pb-3">
-              <h3 className="text-base font-bold text-white">Create New Client Profile</h3>
-              <button onClick={() => setShowAddModal(false)} className="text-slate-400 hover:text-white">
-                ✕
-              </button>
+              </form>
             </div>
-
-            {formError && (
-              <div className="p-3 rounded-lg bg-red-500/10 border border-red-500/30 text-xs text-red-300">
-                {formError}
-              </div>
-            )}
-
-            <form onSubmit={handleCreateClient} className="space-y-4">
-              <div>
-                <label className="text-xs font-medium text-slate-300 block mb-1">Business / Client Name *</label>
-                <input
-                  type="text"
-                  required
-                  value={newName}
-                  onChange={(e) => setNewName(e.target.value)}
-                  placeholder="e.g., Kelly Hyundai of Stroudsburg"
-                  className="w-full bg-[#151D2A] border border-[#A9C7E5]/20 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-[#D99614]"
-                />
-              </div>
-
-              <div>
-                <label className="text-xs font-medium text-slate-300 block mb-1">Primary Website Domain</label>
-                <input
-                  type="text"
-                  value={newDomain}
-                  onChange={(e) => setNewDomain(e.target.value)}
-                  placeholder="e.g., https://kellyhyundai.com"
-                  className="w-full bg-[#151D2A] border border-[#A9C7E5]/20 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-[#D99614]"
-                />
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="text-xs font-medium text-slate-300 block mb-1">Timezone</label>
-                  <input
-                    type="text"
-                    value={newTimezone}
-                    onChange={(e) => setNewTimezone(e.target.value)}
-                    className="w-full bg-[#151D2A] border border-[#A9C7E5]/20 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-[#D99614]"
-                  />
-                </div>
-                <div>
-                  <label className="text-xs font-medium text-slate-300 block mb-1">Currency</label>
-                  <input
-                    type="text"
-                    value={newCurrency}
-                    onChange={(e) => setNewCurrency(e.target.value)}
-                    className="w-full bg-[#151D2A] border border-[#A9C7E5]/20 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-[#D99614]"
-                  />
-                </div>
-              </div>
-
-              <div className="pt-2 flex justify-end space-x-2">
-                <button
-                  type="button"
-                  onClick={() => setShowAddModal(false)}
-                  className="px-4 py-2 bg-[#151D2A] text-slate-300 rounded-lg text-xs font-medium"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={submitting}
-                  className="px-4 py-2 bg-[#D99614] hover:bg-[#B97A08] text-[#0B0F17] font-semibold rounded-lg text-xs"
-                >
-                  {submitting ? 'Creating...' : 'Create Client'}
-                </button>
-              </div>
-            </form>
           </div>
-        </div>
-      )}
-
-      {editingClient && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4">
-          <div className="w-full max-w-md bg-[#111622] border border-[#A9C7E5]/20 rounded-xl p-6 space-y-4 shadow-2xl">
-            <div className="flex justify-between items-center border-b border-[#A9C7E5]/10 pb-3">
-              <h3 className="text-base font-bold text-white">Edit Client Profile</h3>
-              <button onClick={() => setEditingClient(null)} className="text-slate-400 hover:text-white">
-                ✕
-              </button>
-            </div>
-
-            {formError && (
-              <div className="p-3 rounded-lg bg-red-500/10 border border-red-500/30 text-xs text-red-300">
-                {formError}
-              </div>
-            )}
-
-            <form onSubmit={handleUpdateClient} className="space-y-4">
-              <div>
-                <label className="text-xs font-medium text-slate-300 block mb-1">Business / Client Name *</label>
-                <input
-                  type="text"
-                  required
-                  value={editName}
-                  onChange={(e) => setEditName(e.target.value)}
-                  className="w-full bg-[#151D2A] border border-[#A9C7E5]/20 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-[#D99614]"
-                />
-              </div>
-
-              <div>
-                <label className="text-xs font-medium text-slate-300 block mb-1">Primary Website Domain</label>
-                <input
-                  type="text"
-                  value={editDomain}
-                  onChange={(e) => setEditDomain(e.target.value)}
-                  className="w-full bg-[#151D2A] border border-[#A9C7E5]/20 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-[#D99614]"
-                />
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="text-xs font-medium text-slate-300 block mb-1">Timezone</label>
-                  <input
-                    type="text"
-                    value={editTimezone}
-                    onChange={(e) => setEditTimezone(e.target.value)}
-                    className="w-full bg-[#151D2A] border border-[#A9C7E5]/20 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-[#D99614]"
-                  />
-                </div>
-                <div>
-                  <label className="text-xs font-medium text-slate-300 block mb-1">Currency</label>
-                  <input
-                    type="text"
-                    value={editCurrency}
-                    onChange={(e) => setEditCurrency(e.target.value)}
-                    className="w-full bg-[#151D2A] border border-[#A9C7E5]/20 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-[#D99614]"
-                  />
-                </div>
-              </div>
-
-              <div className="pt-2 flex justify-end space-x-2">
-                <button
-                  type="button"
-                  onClick={() => setEditingClient(null)}
-                  className="px-4 py-2 bg-[#151D2A] text-slate-300 rounded-lg text-xs font-medium"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={submitting}
-                  className="px-4 py-2 bg-[#D99614] hover:bg-[#B97A08] text-[#0B0F17] font-semibold rounded-lg text-xs"
-                >
-                  {submitting ? 'Saving...' : 'Save Changes'}
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-    </main>
+        )}
+      </main>
+    </div>
   );
 }
 
-export default function ClientsPortfolioPage() {
+export default function ClientsPage() {
   return (
-    <div className="min-h-screen bg-[#0B0F17] text-white flex flex-col font-sans">
-      <Suspense fallback={<div className="p-6 text-xs text-slate-400">Loading Header...</div>}>
-        <GlobalHeader />
-      </Suspense>
-      <Suspense fallback={<div className="p-6 text-xs text-slate-400">Loading Client Portfolio...</div>}>
-        <ClientPortfolioContent />
-      </Suspense>
-    </div>
+    <Suspense fallback={<div className="p-6 text-xs text-slate-500">Loading Clients...</div>}>
+      <ClientsPortfolioContent />
+    </Suspense>
   );
 }
