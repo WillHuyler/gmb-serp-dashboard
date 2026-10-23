@@ -13,6 +13,7 @@ export interface RawClientRow {
   created_at?: string | null;
   timezone?: string | null;
   currency?: string | null;
+  [key: string]: any;
 }
 
 export interface JoinedAccountMapping {
@@ -80,9 +81,7 @@ function assignProviderMappingKey(
 
 /**
  * Normalizes a verified database client row and its relational mappings.
- * Supports both:
- * - normalizeVerifiedClientRecord(row, joinedMappings, hasVerifiedTelemetry: boolean)
- * - normalizeVerifiedClientRecord(row, joinedMappings, integrationAccounts: RawIntegrationAccountRow[], hasVerifiedTelemetry: boolean)
+ * Supports 2, 3, or 4 arguments seamlessly so all callers compile cleanly.
  */
 export function normalizeVerifiedClientRecord(
   row: RawClientRow,
@@ -133,7 +132,7 @@ export function normalizeVerifiedClientRecord(
       row.data_certification_status || (isCertified ? 'CERTIFIED' : 'UNCERTIFIED'),
     status: isCertified ? 'active' : 'onboarding',
     is_certified: isCertified,
-    service_areas: [],
+    service_areas: Array.isArray(row.service_areas) ? row.service_areas : [],
     mappings,
     mapped_resource_count: Math.max(joinedMappings.length, mappedKeysCount),
     last_sync_at: latestSyncAt,
