@@ -117,7 +117,8 @@ function ClientsPortfolioContent() {
               MULTI-TENANT AGENCY PORTFOLIO & CLIENT GOVERNANCE
             </span>
             <h1 className="text-2xl font-extrabold tracking-tight text-[#0B1F3A] mt-1">
-              Authorized Client Registry ({clientRegistry.length})
+              Authorized Client Registry
+              {registryState === 'CLIENTS_AVAILABLE' ? ` (${clientRegistry.length})` : ''}
             </h1>
             <p className="text-sm text-slate-600 mt-1">
               Manage verified client locations, GBP store codes, domains, and provider mappings across your authorized tenants.
@@ -135,7 +136,8 @@ function ClientsPortfolioContent() {
             <button
               type="button"
               onClick={openCreateModal}
-              className="px-4 py-2 bg-[#D99614] hover:bg-[#B87D0E] text-[#0B1F3A] font-bold text-xs rounded-lg shadow-sm"
+              disabled={registryState !== 'CLIENTS_AVAILABLE' && registryState !== 'NO_CLIENTS_ASSIGNED'}
+              className="px-4 py-2 bg-[#D99614] hover:bg-[#B87D0E] disabled:opacity-50 text-[#0B1F3A] font-bold text-xs rounded-lg shadow-sm"
             >
               + Add New Client
             </button>
@@ -174,10 +176,10 @@ function ClientsPortfolioContent() {
         {registryState === 'AUTH_REQUIRED' ? (
           <div className="bg-amber-50 border border-amber-300 rounded-xl p-8 text-center space-y-3">
             <h3 className="text-base font-bold text-amber-900">
-              Sign In Required to View Your 9 Authorized Clients
+              Authentication Required
             </h3>
             <p className="text-xs text-amber-800 max-w-md mx-auto">
-              Authenticate with your administrator credentials so PorchLight can verify your tenant memberships and load your client portfolio.
+              Authenticate with your administrator credentials so PorchLight can verify your tenant memberships and load your authorized client portfolio.
             </p>
             <Link
               href="/login"
