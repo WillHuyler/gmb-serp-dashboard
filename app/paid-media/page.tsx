@@ -2,9 +2,7 @@
 
 import React, { useState, useEffect, Suspense } from 'react';
 import Link from 'next/link';
-import { useSearchParams } from 'next/navigation';
 import { useClient } from '../../lib/client-context';
-import GlobalHeader from '../../components/navigation/GlobalHeader';
 import TrustCertificationStrip, {
   DataTrustState,
 } from '../../components/design-system/TrustCertificationStrip';
@@ -14,13 +12,11 @@ import TriPartInsightCard from '../../components/design-system/TriPartInsightCar
 export const dynamic = 'force-dynamic';
 
 function PaidMediaContent() {
-  const searchParams = useSearchParams();
-  const { activeClient } = useClient();
+  const { activeClient, reportingPeriod } = useClient();
   const [metrics, setMetrics] = useState<any | null>(null);
   const [loading, setLoading] = useState(false);
 
-  const startDate = searchParams.get('startDate') || '2026-09-01';
-  const endDate = searchParams.get('endDate') || '2026-09-30';
+  const { startDate, endDate } = reportingPeriod;
   const isCertified = Boolean(activeClient?.is_certified);
 
   useEffect(() => {
@@ -60,7 +56,6 @@ function PaidMediaContent() {
     isCertified && metrics && metrics.record_count > 0 && typeof metrics.total_spend === 'number'
   );
 
-  // Strict CPL denominator guard: never compute CPL if conversions <= 0
   const verifiedConversions =
     hasVerifiedPaid && typeof metrics?.total_conversions === 'number'
       ? metrics.total_conversions
@@ -83,7 +78,7 @@ function PaidMediaContent() {
     : 'UNMAPPED_SETUP';
 
   return (
-    <div className="flex-1 flex flex-col">
+    <div className="flex-1 flex flex-col bg-[#F4F7FB] text-[#0B1F3A]">
       <TrustCertificationStrip
         client={activeClient}
         trustState={trustState}
@@ -92,24 +87,31 @@ function PaidMediaContent() {
         reportingPeriod={{ startDate, endDate }}
       />
 
-      <main className="flex-1 p-6 max-w-[1600px] w-full mx-auto space-y-6 text-white font-sans">
-        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-[#111622] border border-[#A9C7E5]/15 rounded-xl p-6">
+      <main className="flex-1 p-6 max-w-[1600px] w-full mx-auto space-y-6 font-sans">
+        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-white border border-[#DCE5EF] rounded-xl p-6 shadow-sm">
           <div>
-            <span className="font-mono text-xs uppercase tracking-widest text-[#D99614] font-bold block">
+            <span className="text-xs uppercase tracking-wider text-[#D99614] font-bold block">
               PAID ACQUISITION TELEMETRY • GOOGLE ADS & META ADS
             </span>
-            <h1 className="text-2xl font-bold tracking-tight text-white mt-1">
+            <h1 className="text-2xl font-extrabold tracking-tight text-[#0B1F3A] mt-1">
               Paid Media Performance — {activeClient?.name || 'Select Client'}
             </h1>
-            <p className="text-sm text-slate-400 mt-1">
-              Google Ads ID: <span className="font-mono text-slate-200">{activeClient?.mappings?.google_ads_id || 'Unmapped'}</span> • Meta Ad Account: <span className="font-mono text-slate-200">{activeClient?.mappings?.meta_act_id || 'Unmapped'}</span>
+            <p className="text-sm text-slate-600 mt-1">
+              Google Ads ID:{' '}
+              <span className="font-mono font-semibold text-[#0B1F3A]">
+                {activeClient?.mappings?.google_ads_id || 'Unmapped'}
+              </span>{' '}
+              • Meta Ad Account:{' '}
+              <span className="font-mono font-semibold text-[#0B1F3A]">
+                {activeClient?.mappings?.meta_act_id || 'Unmapped'}
+              </span>
             </p>
           </div>
 
           {activeClient && (
             <Link
               href={`/connection-center?clientId=${activeClient.id}`}
-              className="px-4 py-2 bg-[#151D2A] hover:bg-[#1C273A] border border-[#A9C7E5]/20 rounded-lg text-xs font-semibold text-slate-200"
+              className="px-4 py-2 bg-[#0B1F3A] hover:bg-[#16325B] text-white rounded-lg text-xs font-bold shadow-sm"
             >
               Manage Ad Account Mappings →
             </Link>
@@ -126,6 +128,7 @@ function PaidMediaContent() {
             provenanceNote={activeClient?.mappings?.google_ads_id || 'Unmapped'}
             isCertified={hasVerifiedPaid}
             isLoading={loading}
+            accentColor="blue"
           />
 
           <KpiMetricCard
@@ -137,6 +140,7 @@ function PaidMediaContent() {
             provenanceNote="Verified Ad Clicks"
             isCertified={hasVerifiedPaid}
             isLoading={loading}
+            accentColor="teal"
           />
 
           <KpiMetricCard
@@ -149,6 +153,7 @@ function PaidMediaContent() {
             isCertified={hasVerifiedPaid}
             isLoading={loading}
             accentHighlight={true}
+            accentColor="gold"
           />
 
           <KpiMetricCard
@@ -157,9 +162,12 @@ function PaidMediaContent() {
             format="currency"
             invertDeltaPolarity={true}
             sourceBadge="CPL GUARDED"
-            provenanceNote={verifiedConversions && verifiedConversions > 0 ? 'Spend / Leads' : 'Requires >0 Leads'}
+            provenanceNote={
+              verifiedConversions && verifiedConversions > 0 ? 'Spend / Leads' : 'Requires >0 Leads'
+            }
             isCertified={Boolean(hasVerifiedPaid && verifiedCpl !== null)}
             isLoading={loading}
+            accentColor="violet"
           />
         </div>
 
@@ -197,13 +205,8 @@ function PaidMediaContent() {
 
 export default function PaidMediaPage() {
   return (
-    <div className="min-h-screen bg-[#0B0F17] text-white flex flex-col font-sans">
-      <Suspense fallback={<div className="p-6 text-xs text-slate-400">Loading Header...</div>}>
-        <GlobalHeader />
-      </Suspense>
-      <Suspense fallback={<div className="p-6 text-xs text-slate-400">Loading Paid Media...</div>}>
-        <PaidMediaContent />
-      </Suspense>
-    </div>
+    <Suspense fallback={<div className="p-6 text-xs text-slate-500">Loading Paid Media...</div>}>
+      <PaidMediaContent />
+    </Suspense>
   );
 }
