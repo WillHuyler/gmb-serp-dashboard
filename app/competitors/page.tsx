@@ -3,7 +3,6 @@
 import React, { useState, useEffect, Suspense } from 'react';
 import Link from 'next/link';
 import { useClient } from '../../lib/client-context';
-import GlobalHeader from '../../components/navigation/GlobalHeader';
 import TrustCertificationStrip, {
   DataTrustState,
 } from '../../components/design-system/TrustCertificationStrip';
@@ -13,7 +12,7 @@ import TriPartInsightCard from '../../components/design-system/TriPartInsightCar
 export const dynamic = 'force-dynamic';
 
 function CompetitorsContent() {
-  const { activeClient } = useClient();
+  const { activeClient, reportingPeriod } = useClient();
   const [metrics, setMetrics] = useState<any | null>(null);
   const [loading, setLoading] = useState(false);
 
@@ -63,31 +62,32 @@ function CompetitorsContent() {
     : 'UNMAPPED_SETUP';
 
   return (
-    <div className="flex-1 flex flex-col">
+    <div className="flex-1 flex flex-col bg-[#F4F7FB] text-[#0B1F3A]">
       <TrustCertificationStrip
         client={activeClient}
         trustState={trustState}
         lastIngestedAt={metrics?.last_ingested_at}
         recordCount={competitorsList.length}
+        reportingPeriod={reportingPeriod}
       />
 
-      <main className="flex-1 p-6 max-w-[1600px] w-full mx-auto space-y-6 text-white font-sans">
-        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-[#111622] border border-[#A9C7E5]/15 rounded-xl p-6">
+      <main className="flex-1 p-6 max-w-[1600px] w-full mx-auto space-y-6 font-sans">
+        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-white border border-[#DCE5EF] rounded-xl p-6 shadow-sm">
           <div>
-            <span className="font-mono text-xs uppercase tracking-widest text-[#D99614] font-bold block">
+            <span className="text-xs uppercase tracking-wider text-[#D99614] font-bold block">
               KEYWORD-BOUND SERP DISPLACEMENT MATRIX
             </span>
-            <h1 className="text-2xl font-bold tracking-tight text-white mt-1">
+            <h1 className="text-2xl font-extrabold tracking-tight text-[#0B1F3A] mt-1">
               Competitive Overlap — {activeClient?.name || 'Select Client'}
             </h1>
-            <p className="text-sm text-slate-400 mt-1">
+            <p className="text-sm text-slate-600 mt-1">
               Tracks real local businesses competing across the same 25 geo-grid coordinates and target keywords. Zero hardcoded competitor fixtures.
             </p>
           </div>
 
           <Link
             href={`/otterwatch?clientId=${activeClient?.id || ''}`}
-            className="px-4 py-2 bg-[#D99614] hover:bg-[#B97A08] text-[#0B0F17] font-semibold text-xs rounded-lg"
+            className="px-4 py-2 bg-[#D99614] hover:bg-[#B87D0E] text-[#0B1F3A] font-bold text-xs rounded-lg shadow-sm"
           >
             Inspect 5×5 Geo-Grid →
           </Link>
@@ -103,6 +103,7 @@ function CompetitorsContent() {
             isCertified={hasVerifiedCompetitors}
             isLoading={loading}
             accentHighlight={true}
+            accentColor="gold"
           />
 
           <KpiMetricCard
@@ -114,6 +115,7 @@ function CompetitorsContent() {
             provenanceNote="Across Scanned Nodes"
             isCertified={hasVerifiedCompetitors}
             isLoading={loading}
+            accentColor="blue"
           />
 
           <KpiMetricCard
@@ -124,25 +126,26 @@ function CompetitorsContent() {
             provenanceNote="Verified Local Contenders"
             isCertified={hasVerifiedCompetitors}
             isLoading={loading}
+            accentColor="teal"
           />
         </div>
 
-        <div className="bg-[#111622] border border-[#A9C7E5]/15 rounded-xl p-5 space-y-4">
-          <div className="border-b border-[#A9C7E5]/10 pb-3 flex items-center justify-between">
-            <h3 className="text-base font-bold text-white">
+        <div className="bg-white border border-[#DCE5EF] rounded-xl p-6 space-y-4 shadow-sm">
+          <div className="border-b border-[#DCE5EF] pb-3 flex items-center justify-between">
+            <h3 className="text-base font-bold text-[#0B1F3A]">
               Observed Map Pack Competitors ({activeClient?.name || 'Client'})
             </h3>
-            <span className="font-mono text-xs text-slate-400">
+            <span className="font-mono text-xs text-slate-500">
               SOURCE: PUBLIC.KEYWORD_RANKINGS / RANK_HISTORY
             </span>
           </div>
 
           {!hasVerifiedCompetitors ? (
-            <div className="p-8 text-center bg-[#151D2A] rounded-xl border border-[#A9C7E5]/10 space-y-2">
-              <p className="text-sm font-bold text-white">
+            <div className="p-8 text-center bg-[#F4F7FB] rounded-xl border border-[#DCE5EF] space-y-2">
+              <p className="text-sm font-bold text-[#0B1F3A]">
                 No Verified Competitor SERP Observations Recorded
               </p>
-              <p className="text-xs text-slate-400 max-w-lg mx-auto">
+              <p className="text-xs text-slate-600 max-w-lg mx-auto">
                 Per CR-007, PorchLight never renders hardcoded competitor names or synthetic Share-of-Voice percentages. Execute a verified 5×5 SERP scan for {activeClient?.name || 'this client'} to populate observed local pack competitors.
               </p>
             </div>
@@ -150,24 +153,24 @@ function CompetitorsContent() {
             <div className="overflow-x-auto">
               <table className="w-full text-left border-collapse text-xs">
                 <thead>
-                  <tr className="border-b border-[#A9C7E5]/10 text-slate-400 font-mono text-[10px] uppercase">
-                    <th className="py-2.5 px-3">Business Name</th>
-                    <th className="py-2.5 px-3">Observed Avg Rank</th>
-                    <th className="py-2.5 px-3">Grid Share of Voice</th>
-                    <th className="py-2.5 px-3 text-right">Verified Reviews</th>
+                  <tr className="border-b border-[#DCE5EF] text-slate-500 font-bold uppercase text-[11px] bg-[#F4F7FB]">
+                    <th className="py-3 px-3">Business Name</th>
+                    <th className="py-3 px-3">Observed Avg Rank</th>
+                    <th className="py-3 px-3">Grid Share of Voice</th>
+                    <th className="py-3 px-3 text-right">Verified Reviews</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-[#A9C7E5]/10">
+                <tbody className="divide-y divide-[#DCE5EF]">
                   {competitorsList.map((comp: any, idx: number) => (
-                    <tr key={comp.name || idx} className="hover:bg-[#151D2A]/60">
-                      <td className="py-3 px-3 font-semibold text-white">{comp.name}</td>
-                      <td className="py-3 px-3 font-mono text-[#D99614]">
+                    <tr key={comp.name || idx} className="hover:bg-[#F4F7FB]">
+                      <td className="py-3 px-3 font-bold text-[#0B1F3A]">{comp.name}</td>
+                      <td className="py-3 px-3 font-mono font-bold text-[#D99614]">
                         #{Number(comp.avgRank || 0).toFixed(1)}
                       </td>
-                      <td className="py-3 px-3 font-mono text-slate-200">
+                      <td className="py-3 px-3 font-mono text-[#0B1F3A]">
                         {Number(comp.sovPercent || 0).toFixed(1)}%
                       </td>
-                      <td className="py-3 px-3 text-right font-mono text-slate-300">
+                      <td className="py-3 px-3 text-right font-mono text-slate-600">
                         {comp.reviewCount ?? '—'}
                       </td>
                     </tr>
@@ -198,13 +201,8 @@ function CompetitorsContent() {
 
 export default function CompetitorsPage() {
   return (
-    <div className="min-h-screen bg-[#0B0F17] text-white flex flex-col font-sans">
-      <Suspense fallback={<div className="p-6 text-xs text-slate-400">Loading Header...</div>}>
-        <GlobalHeader />
-      </Suspense>
-      <Suspense fallback={<div className="p-6 text-xs text-slate-400">Loading Competitors...</div>}>
-        <CompetitorsContent />
-      </Suspense>
-    </div>
+    <Suspense fallback={<div className="p-6 text-xs text-slate-500">Loading Competitors...</div>}>
+      <CompetitorsContent />
+    </Suspense>
   );
 }
