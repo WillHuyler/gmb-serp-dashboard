@@ -8,12 +8,15 @@ export interface AuthenticatedContext {
   tenantId: string;
   authorizedTenantIds: string[];
   accessToken: string;
+  [key: string]: any;
 }
 
 export interface AuthGuardResult {
   authorized: boolean;
   context?: AuthenticatedContext;
   errorResponse?: NextResponse;
+  response?: NextResponse;
+  [key: string]: any;
 }
 
 export function getUserScopedSupabaseClient(accessToken: string): SupabaseClient {
@@ -81,18 +84,20 @@ export async function resolveAuthenticatedContext(
     : cookieToken;
 
   if (!accessToken) {
+    const errRes = NextResponse.json(
+      {
+        success: false,
+        error: {
+          code: 'UNAUTHENTICATED',
+          message: 'Authentication required. Please sign in.',
+        },
+      },
+      { status: 401 }
+    );
     return {
       authorized: false,
-      errorResponse: NextResponse.json(
-        {
-          success: false,
-          error: {
-            code: 'UNAUTHENTICATED',
-            message: 'Authentication required. Please sign in.',
-          },
-        },
-        { status: 401 }
-      ),
+      errorResponse: errRes,
+      response: errRes,
     };
   }
 
@@ -103,18 +108,20 @@ export async function resolveAuthenticatedContext(
     );
 
     if (userErr || !userData?.user) {
+      const errRes = NextResponse.json(
+        {
+          success: false,
+          error: {
+            code: 'INVALID_SESSION',
+            message: 'Session expired or invalid. Please sign in again.',
+          },
+        },
+        { status: 401 }
+      );
       return {
         authorized: false,
-        errorResponse: NextResponse.json(
-          {
-            success: false,
-            error: {
-              code: 'INVALID_SESSION',
-              message: 'Session expired or invalid. Please sign in again.',
-            },
-          },
-          { status: 401 }
-        ),
+        errorResponse: errRes,
+        response: errRes,
       };
     }
 
@@ -155,18 +162,20 @@ export async function resolveAuthenticatedContext(
       : membershipTenantIds;
 
     if (authorizedTenantIds.length === 0) {
+      const errRes = NextResponse.json(
+        {
+          success: false,
+          error: {
+            code: 'NO_TENANT_MEMBERSHIP',
+            message: 'User has no authorized tenant memberships.',
+          },
+        },
+        { status: 403 }
+      );
       return {
         authorized: false,
-        errorResponse: NextResponse.json(
-          {
-            success: false,
-            error: {
-              code: 'NO_TENANT_MEMBERSHIP',
-              message: 'User has no authorized tenant memberships.',
-            },
-          },
-          { status: 403 }
-        ),
+        errorResponse: errRes,
+        response: errRes,
       };
     }
 
@@ -192,18 +201,20 @@ export async function resolveAuthenticatedContext(
       },
     };
   } catch (err: any) {
+    const errRes = NextResponse.json(
+      {
+        success: false,
+        error: {
+          code: 'AUTH_RESOLUTION_ERROR',
+          message: err?.message || 'Failed to verify authentication context.',
+        },
+      },
+      { status: 500 }
+    );
     return {
       authorized: false,
-      errorResponse: NextResponse.json(
-        {
-          success: false,
-          error: {
-            code: 'AUTH_RESOLUTION_ERROR',
-            message: err?.message || 'Failed to verify authentication context.',
-          },
-        },
-        { status: 500 }
-      ),
+      errorResponse: errRes,
+      response: errRes,
     };
   }
 }
@@ -227,34 +238,38 @@ export async function validateClientAccess(
       .maybeSingle();
 
     if (clientErr || !clientRow) {
+      const errRes = NextResponse.json(
+        {
+          success: false,
+          error: {
+            code: 'CLIENT_FORBIDDEN_OR_NOT_FOUND',
+            message: 'Client not found or access denied for this tenant.',
+          },
+        },
+        { status: 403 }
+      );
       return {
         authorized: false,
-        errorResponse: NextResponse.json(
-          {
-            success: false,
-            error: {
-              code: 'CLIENT_FORBIDDEN_OR_NOT_FOUND',
-              message: 'Client not found or access denied for this tenant.',
-            },
-          },
-          { status: 403 }
-        ),
+        errorResponse: errRes,
+        response: errRes,
       };
     }
 
     if (!authCheck.context.authorizedTenantIds.includes(clientRow.tenant_id)) {
+      const errRes = NextResponse.json(
+        {
+          success: false,
+          error: {
+            code: 'CROSS_TENANT_DENIED',
+            message: 'Cross-tenant client access is strictly forbidden.',
+          },
+        },
+        { status: 403 }
+      );
       return {
         authorized: false,
-        errorResponse: NextResponse.json(
-          {
-            success: false,
-            error: {
-              code: 'CROSS_TENANT_DENIED',
-              message: 'Cross-tenant client access is strictly forbidden.',
-            },
-          },
-          { status: 403 }
-        ),
+        errorResponse: errRes,
+        response: errRes,
       };
     }
 
@@ -266,18 +281,20 @@ export async function validateClientAccess(
       },
     };
   } catch (err: any) {
+    const errRes = NextResponse.json(
+      {
+        success: false,
+        error: {
+          code: 'CLIENT_ACCESS_CHECK_FAILED',
+          message: err?.message || 'Error validating client access.',
+        },
+      },
+      { status: 500 }
+    );
     return {
       authorized: false,
-      errorResponse: NextResponse.json(
-        {
-          success: false,
-          error: {
-            code: 'CLIENT_ACCESS_CHECK_FAILED',
-            message: err?.message || 'Error validating client access.',
-          },
-        },
-        { status: 500 }
-      ),
+      errorResponse: errRes,
+      response: errRes,
     };
   }
 }
