@@ -6,8 +6,15 @@ import React, {
   useState,
   useEffect,
   useCallback,
+  useRef,
   ReactNode,
 } from 'react';
+import {
+  ReportingPeriod,
+  buildDynamicReportingPresets,
+  resolveUserTimezone,
+  isValidIsoDateString,
+} from './reporting-period';
 
 export type ProviderMappingKey =
   | 'gmb_account_id'
@@ -80,6 +87,7 @@ export const CANONICAL_CLIENTS: ClientProfile[] = [];
 export type RegistryLoadState =
   | 'AUTH_LOADING'
   | 'AUTH_REQUIRED'
+  | 'FORBIDDEN'
   | 'CLIENTS_LOADING'
   | 'QUERY_FAILED'
   | 'NO_CLIENTS_ASSIGNED'
@@ -89,13 +97,10 @@ export interface AuthenticatedUserInfo {
   id: string;
   email: string;
   role: string;
+  authorizedTenantIds?: string[];
 }
 
-export interface ReportingPeriod {
-  startDate: string;
-  endDate: string;
-  presetLabel: string;
-}
+export type { ReportingPeriod };
 
 interface ClientContextType {
   activeClient: ClientProfile | null;
@@ -106,20 +111,21 @@ interface ClientContextType {
   setActiveClientId: (id: string) => void;
   addClient: (newClient: ClientProfile) => void;
   refreshClients: () => Promise<ClientProfile[]>;
+  signOutCleanly: () => Promise<void>;
   isLoading: boolean;
   registryState: RegistryLoadState;
   authStatus: 'loading' | 'authenticated' | 'unauthenticated' | 'forbidden' | 'error';
   currentUser: AuthenticatedUserInfo | null;
+  userTimezone: string;
+  setUserTimezone: (tz: string) => void;
   reportingPeriod: ReportingPeriod;
+  reportingPresets: ReportingPeriod[];
   setReportingPeriod: (period: ReportingPeriod) => void;
+  clientSwitchVersion: number;
   error: string | null;
 }
 
-const DEFAULT_REPORTING_PERIOD: ReportingPeriod = {
-  startDate: '2026-09-01',
-  endDate: '2026-09-30',
-  presetLabel: 'Last Complete Month (Sep 2026)',
-};
+const initialPresets = buildDynamicReportingPresets('America/New_York');
 
 const ClientContext = createContext<ClientContextType>({
   activeClient: null,
@@ -130,17 +136,23 @@ const ClientContext = createContext<ClientContextType>({
   setActiveClientId: () => {},
   addClient: () => {},
   refreshClients: async () => [],
+  signOutCleanly: async () => {},
   isLoading: true,
   registryState: 'AUTH_LOADING',
   authStatus: 'loading',
   currentUser: null,
-  reportingPeriod: DEFAULT_REPORTING_PERIOD,
+  userTimezone: 'America/New_York',
+  setUserTimezone: () => {},
+  reportingPeriod: initialPresets[0],
+  reportingPresets: initialPresets,
   setReportingPeriod: () => {},
+  clientSwitchVersion: 0,
   error: null,
 });
 
 const ACTIVE_CLIENT_STORAGE_KEY = 'porchlight_active_client_id';
 const REPORTING_PERIOD_STORAGE_KEY = 'porchlight_reporting_period';
+const USER_TIMEZONE_STORAGE_KEY = 'porchlight_user_timezone';
 
 export function ClientProvider({ children }: { children: ReactNode }) {
   const [clientList, setClientList] = useState<ClientProfile[]>([]);
@@ -151,64 +163,177 @@ export function ClientProvider({ children }: { children: ReactNode }) {
     'loading' | 'authenticated' | 'unauthenticated' | 'forbidden' | 'error'
   >('loading');
   const [currentUser, setCurrentUser] = useState<AuthenticatedUserInfo | null>(null);
-  const [reportingPeriod, setReportingPeriodState] = useState<ReportingPeriod>(
-    DEFAULT_REPORTING_PERIOD
-  );
+  const [userTimezone, setUserTimezoneState] = useState<string>('America/New_York');
+  const [reportingPresets, setReportingPresets] = useState<ReportingPeriod[]>(initialPresets);
+  const [reportingPeriod, setReportingPeriodState] = useState<ReportingPeriod>(initialPresets[0]);
+  const [clientSwitchVersion, setClientSwitchVersion] = useState<number>(0);
   const [error, setError] = useState<string | null>(null);
+
+  const fetchGenerationRef = useRef<number>(0);
 
   useEffect(() => {
     if (typeof window !== 'undefined') {
+      const savedTz =
+        localStorage.getItem(USER_TIMEZONE_STORAGE_KEY) || resolveUserTimezone();
+      setUserTimezoneState(savedTz);
+      const dynamicPresets = buildDynamicReportingPresets(savedTz);
+      setReportingPresets(dynamicPresets);
+
+      const urlParams = new URLSearchParams(window.location.search);
+      const urlStart = urlParams.get('startDate');
+      const urlEnd = urlParams.get('endDate');
+
+      if (isValidIsoDateString(urlStart) && isValidIsoDateString(urlEnd)) {
+        const matched = dynamicPresets.find(
+          (p) => p.startDate === urlStart && p.endDate === urlEnd
+        );
+        setReportingPeriodState(
+          matched || {
+            presetId: 'CUSTOM',
+            startDate: urlStart,
+            endDate: urlEnd,
+            presetLabel: `${urlStart} → ${urlEnd}`,
+            timezone: savedTz,
+          }
+        );
+        return;
+      }
+
       try {
-        const savedPeriod = localStorage.getItem(REPORTING_PERIOD_STORAGE_KEY);
-        if (savedPeriod) {
-          const parsed = JSON.parse(savedPeriod);
-          if (parsed?.startDate && parsed?.endDate) {
-            setReportingPeriodState(parsed);
+        const savedPeriodRaw = localStorage.getItem(REPORTING_PERIOD_STORAGE_KEY);
+        if (savedPeriodRaw) {
+          const parsed = JSON.parse(savedPeriodRaw);
+          if (parsed?.presetId && parsed.presetId !== 'CUSTOM') {
+            const matchedPreset = dynamicPresets.find(
+              (p) => p.presetId === parsed.presetId
+            );
+            if (matchedPreset) {
+              setReportingPeriodState(matchedPreset);
+              return;
+            }
+          } else if (
+            isValidIsoDateString(parsed?.startDate) &&
+            isValidIsoDateString(parsed?.endDate)
+          ) {
+            setReportingPeriodState({
+              presetId: 'CUSTOM',
+              startDate: parsed.startDate,
+              endDate: parsed.endDate,
+              presetLabel: `${parsed.startDate} → ${parsed.endDate}`,
+              timezone: savedTz,
+            });
+            return;
           }
         }
       } catch {
-        // Ignore storage parse error
+        // Ignore parse error and use default dynamic preset
       }
+
+      setReportingPeriodState(dynamicPresets[0]);
     }
   }, []);
 
+  const setUserTimezone = (tz: string) => {
+    const resolved = resolveUserTimezone(tz);
+    setUserTimezoneState(resolved);
+    const updatedPresets = buildDynamicReportingPresets(resolved);
+    setReportingPresets(updatedPresets);
+    const matching =
+      updatedPresets.find((p) => p.presetId === reportingPeriod.presetId) ||
+      updatedPresets[0];
+    setReportingPeriodState(matching);
+    if (typeof window !== 'undefined') {
+      localStorage.setItem(USER_TIMEZONE_STORAGE_KEY, resolved);
+      localStorage.setItem(REPORTING_PERIOD_STORAGE_KEY, JSON.stringify(matching));
+    }
+  };
+
   const setReportingPeriod = (period: ReportingPeriod) => {
     setReportingPeriodState(period);
+    setClientSwitchVersion((v) => v + 1);
     if (typeof window !== 'undefined') {
       localStorage.setItem(REPORTING_PERIOD_STORAGE_KEY, JSON.stringify(period));
     }
   };
 
   const purgeCrossClientCache = (prevId?: string) => {
-    if (typeof window === 'undefined' || !prevId) return;
-    localStorage.removeItem(`pl_insights_${prevId}`);
-    sessionStorage.removeItem(`pl_telemetry_${prevId}`);
-    sessionStorage.removeItem(`pl_serp_${prevId}`);
+    if (typeof window === 'undefined') return;
+    if (prevId) {
+      localStorage.removeItem(`pl_insights_${prevId}`);
+      sessionStorage.removeItem(`pl_telemetry_${prevId}`);
+      sessionStorage.removeItem(`pl_serp_${prevId}`);
+    }
   };
 
+  const signOutCleanly = useCallback(async () => {
+    purgeCrossClientCache(activeClient?.id);
+    await fetch('/api/auth/session', { method: 'DELETE', credentials: 'include' }).catch(
+      () => {}
+    );
+    if (typeof window !== 'undefined') {
+      localStorage.removeItem(ACTIVE_CLIENT_STORAGE_KEY);
+    }
+    setClientList([]);
+    setActiveClientState(null);
+    setCurrentUser(null);
+    setAuthStatus('unauthenticated');
+    setRegistryState('AUTH_REQUIRED');
+    setClientSwitchVersion((v) => v + 1);
+  }, [activeClient?.id]);
+
   const refreshClients = useCallback(async (): Promise<ClientProfile[]> => {
+    const currentGen = ++fetchGenerationRef.current;
     setIsLoading(true);
-    setRegistryState('CLIENTS_LOADING');
+    setRegistryState((prev) =>
+      prev === 'AUTH_LOADING' ? 'AUTH_LOADING' : 'CLIENTS_LOADING'
+    );
     setError(null);
 
-    try {
-      const res = await fetch('/api/clients', {
+    const executeClientsFetch = async () =>
+      fetch('/api/clients', {
         method: 'GET',
         cache: 'no-store',
         credentials: 'include',
         headers: { 'Cache-Control': 'no-cache' },
       });
 
+    try {
+      let res = await executeClientsFetch();
+
+      // CR-023 Requirement #4 & #5: Attempt token refresh via /api/auth/session on 401
+      if (res.status === 401) {
+        const refreshRes = await fetch('/api/auth/session', {
+          method: 'GET',
+          cache: 'no-store',
+          credentials: 'include',
+        });
+
+        if (refreshRes.ok) {
+          res = await executeClientsFetch();
+        } else {
+          if (currentGen !== fetchGenerationRef.current) return [];
+          setClientList([]);
+          setActiveClientState(null);
+          setCurrentUser(null);
+          setAuthStatus('unauthenticated');
+          setRegistryState('AUTH_REQUIRED');
+          setError('Authentication required. Please sign in.');
+          return [];
+        }
+      }
+
+      if (currentGen !== fetchGenerationRef.current) return [];
+
       if (res.status === 401 || res.status === 403) {
         setClientList([]);
         setActiveClientState(null);
         setCurrentUser(null);
         setAuthStatus(res.status === 401 ? 'unauthenticated' : 'forbidden');
-        setRegistryState('AUTH_REQUIRED');
+        setRegistryState(res.status === 401 ? 'AUTH_REQUIRED' : 'FORBIDDEN');
         setError(
           res.status === 401
-            ? 'Session authentication required. Please sign in.'
-            : 'Your account does not have permission for this tenant.'
+            ? 'Authentication required. Please sign in.'
+            : 'Access denied: your account is not assigned to this tenant.'
         );
         return [];
       }
@@ -231,6 +356,7 @@ export function ClientProvider({ children }: { children: ReactNode }) {
           id: data.user.id,
           email: data.user.email || 'Authenticated User',
           role: data.user.role || 'member',
+          authorizedTenantIds: data.meta?.authorizedTenantIds || [],
         });
       }
 
@@ -268,6 +394,7 @@ export function ClientProvider({ children }: { children: ReactNode }) {
 
       return loaded;
     } catch (err: any) {
+      if (currentGen !== fetchGenerationRef.current) return [];
       setClientList([]);
       setActiveClientState(null);
       setAuthStatus('error');
@@ -275,7 +402,9 @@ export function ClientProvider({ children }: { children: ReactNode }) {
       setError(err?.message || 'Network error while loading authorized clients.');
       return [];
     } finally {
-      setIsLoading(false);
+      if (currentGen === fetchGenerationRef.current) {
+        setIsLoading(false);
+      }
     }
   }, []);
 
@@ -285,6 +414,7 @@ export function ClientProvider({ children }: { children: ReactNode }) {
 
   const setActiveClient = (client: ClientProfile | null) => {
     purgeCrossClientCache(activeClient?.id);
+    setClientSwitchVersion((v) => v + 1);
     setActiveClientState(client);
     if (typeof window !== 'undefined') {
       if (client) {
@@ -319,12 +449,17 @@ export function ClientProvider({ children }: { children: ReactNode }) {
         setActiveClientId,
         addClient,
         refreshClients,
+        signOutCleanly,
         isLoading,
         registryState,
         authStatus,
         currentUser,
+        userTimezone,
+        setUserTimezone,
         reportingPeriod,
+        reportingPresets,
         setReportingPeriod,
+        clientSwitchVersion,
         error,
       }}
     >
