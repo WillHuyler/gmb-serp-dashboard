@@ -1,6 +1,13 @@
 'use client';
 
-import React, { createContext, useContext, useState, useEffect, useCallback, ReactNode } from 'react';
+import React, {
+  createContext,
+  useContext,
+  useState,
+  useEffect,
+  useCallback,
+  ReactNode,
+} from 'react';
 
 export type ProviderMappingKey =
   | 'gmb_account_id'
@@ -56,6 +63,7 @@ export interface ClientProfile {
   mapped_resource_count?: number;
   mapped_accounts_count?: number;
   verified_providers_count?: number;
+  last_sync_at?: string | null;
   created_at?: string;
   updated_at?: string;
   organization_id?: string | null;
@@ -69,6 +77,26 @@ export type Client = ClientProfile;
 export const AUTHORITATIVE_CLIENT_REGISTRY: ClientProfile[] = [];
 export const CANONICAL_CLIENTS: ClientProfile[] = [];
 
+export type RegistryLoadState =
+  | 'AUTH_LOADING'
+  | 'AUTH_REQUIRED'
+  | 'CLIENTS_LOADING'
+  | 'QUERY_FAILED'
+  | 'NO_CLIENTS_ASSIGNED'
+  | 'CLIENTS_AVAILABLE';
+
+export interface AuthenticatedUserInfo {
+  id: string;
+  email: string;
+  role: string;
+}
+
+export interface ReportingPeriod {
+  startDate: string;
+  endDate: string;
+  presetLabel: string;
+}
+
 interface ClientContextType {
   activeClient: ClientProfile | null;
   availableClients: ClientProfile[];
@@ -77,57 +105,175 @@ interface ClientContextType {
   setActiveClient: (client: ClientProfile | null) => void;
   setActiveClientId: (id: string) => void;
   addClient: (newClient: ClientProfile) => void;
-  refreshClients: () => Promise<void>;
+  refreshClients: () => Promise<ClientProfile[]>;
   isLoading: boolean;
+  registryState: RegistryLoadState;
   authStatus: 'loading' | 'authenticated' | 'unauthenticated' | 'forbidden' | 'error';
+  currentUser: AuthenticatedUserInfo | null;
+  reportingPeriod: ReportingPeriod;
+  setReportingPeriod: (period: ReportingPeriod) => void;
   error: string | null;
 }
 
-const ClientContext = createContext<ClientContextType | undefined>(undefined);
+const DEFAULT_REPORTING_PERIOD: ReportingPeriod = {
+  startDate: '2026-09-01',
+  endDate: '2026-09-30',
+  presetLabel: 'Last Complete Month (Sep 2026)',
+};
+
+const ClientContext = createContext<ClientContextType>({
+  activeClient: null,
+  availableClients: [],
+  clients: [],
+  clientRegistry: [],
+  setActiveClient: () => {},
+  setActiveClientId: () => {},
+  addClient: () => {},
+  refreshClients: async () => [],
+  isLoading: true,
+  registryState: 'AUTH_LOADING',
+  authStatus: 'loading',
+  currentUser: null,
+  reportingPeriod: DEFAULT_REPORTING_PERIOD,
+  setReportingPeriod: () => {},
+  error: null,
+});
+
+const ACTIVE_CLIENT_STORAGE_KEY = 'porchlight_active_client_id';
+const REPORTING_PERIOD_STORAGE_KEY = 'porchlight_reporting_period';
 
 export function ClientProvider({ children }: { children: ReactNode }) {
   const [clientList, setClientList] = useState<ClientProfile[]>([]);
   const [activeClient, setActiveClientState] = useState<ClientProfile | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(true);
-  const [authStatus, setAuthStatus] = useState<'loading' | 'authenticated' | 'unauthenticated' | 'forbidden' | 'error'>('loading');
+  const [registryState, setRegistryState] = useState<RegistryLoadState>('AUTH_LOADING');
+  const [authStatus, setAuthStatus] = useState<
+    'loading' | 'authenticated' | 'unauthenticated' | 'forbidden' | 'error'
+  >('loading');
+  const [currentUser, setCurrentUser] = useState<AuthenticatedUserInfo | null>(null);
+  const [reportingPeriod, setReportingPeriodState] = useState<ReportingPeriod>(
+    DEFAULT_REPORTING_PERIOD
+  );
   const [error, setError] = useState<string | null>(null);
 
-  const refreshClients = useCallback(async () => {
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      try {
+        const savedPeriod = localStorage.getItem(REPORTING_PERIOD_STORAGE_KEY);
+        if (savedPeriod) {
+          const parsed = JSON.parse(savedPeriod);
+          if (parsed?.startDate && parsed?.endDate) {
+            setReportingPeriodState(parsed);
+          }
+        }
+      } catch {
+        // Ignore storage parse error
+      }
+    }
+  }, []);
+
+  const setReportingPeriod = (period: ReportingPeriod) => {
+    setReportingPeriodState(period);
+    if (typeof window !== 'undefined') {
+      localStorage.setItem(REPORTING_PERIOD_STORAGE_KEY, JSON.stringify(period));
+    }
+  };
+
+  const purgeCrossClientCache = (prevId?: string) => {
+    if (typeof window === 'undefined' || !prevId) return;
+    localStorage.removeItem(`pl_insights_${prevId}`);
+    sessionStorage.removeItem(`pl_telemetry_${prevId}`);
+    sessionStorage.removeItem(`pl_serp_${prevId}`);
+  };
+
+  const refreshClients = useCallback(async (): Promise<ClientProfile[]> => {
     setIsLoading(true);
+    setRegistryState('CLIENTS_LOADING');
     setError(null);
+
     try {
-      const res = await fetch('/api/clients', { cache: 'no-store', credentials: 'include' });
+      const res = await fetch('/api/clients', {
+        method: 'GET',
+        cache: 'no-store',
+        credentials: 'include',
+        headers: { 'Cache-Control': 'no-cache' },
+      });
+
       if (res.status === 401 || res.status === 403) {
         setClientList([]);
         setActiveClientState(null);
+        setCurrentUser(null);
         setAuthStatus(res.status === 401 ? 'unauthenticated' : 'forbidden');
-        setError(res.status === 401 ? 'Authentication required (401).' : 'Access forbidden (403).');
-        return;
+        setRegistryState('AUTH_REQUIRED');
+        setError(
+          res.status === 401
+            ? 'Session authentication required. Please sign in.'
+            : 'Your account does not have permission for this tenant.'
+        );
+        return [];
       }
-      if (!res.ok) {
+
+      const data = await res.json().catch(() => null);
+
+      if (!res.ok || !data?.success) {
         setClientList([]);
         setActiveClientState(null);
         setAuthStatus('error');
-        setError(`Failed to load clients (HTTP ${res.status}).`);
-        return;
+        setRegistryState('QUERY_FAILED');
+        setError(
+          data?.error?.message || `Client registry query failed (HTTP ${res.status}).`
+        );
+        return [];
       }
-      const data = await res.json();
+
+      if (data.user) {
+        setCurrentUser({
+          id: data.user.id,
+          email: data.user.email || 'Authenticated User',
+          role: data.user.role || 'member',
+        });
+      }
+
       const loaded: ClientProfile[] = Array.isArray(data.clients) ? data.clients : [];
       setClientList(loaded);
       setAuthStatus('authenticated');
+
       if (loaded.length === 0) {
         setActiveClientState(null);
-        return;
+        setRegistryState('NO_CLIENTS_ASSIGNED');
+        return [];
       }
-      const urlId = typeof window !== 'undefined' ? new URLSearchParams(window.location.search).get('clientId') : null;
-      const savedId = typeof window !== 'undefined' ? localStorage.getItem('porchlight_active_client_id') : null;
+
+      setRegistryState('CLIENTS_AVAILABLE');
+
+      const urlId =
+        typeof window !== 'undefined'
+          ? new URLSearchParams(window.location.search).get('clientId')
+          : null;
+      const savedId =
+        typeof window !== 'undefined'
+          ? localStorage.getItem(ACTIVE_CLIENT_STORAGE_KEY)
+          : null;
       const targetId = urlId || savedId;
-      setActiveClientState(loaded.find((c) => c.id === targetId) || loaded[0]);
+
+      const selected =
+        (targetId && loaded.find((c) => c.id === targetId)) ||
+        loaded.find((c) => c.is_certified) ||
+        loaded[0];
+
+      setActiveClientState(selected);
+      if (selected && typeof window !== 'undefined') {
+        localStorage.setItem(ACTIVE_CLIENT_STORAGE_KEY, selected.id);
+      }
+
+      return loaded;
     } catch (err: any) {
       setClientList([]);
       setActiveClientState(null);
       setAuthStatus('error');
-      setError(err?.message || 'Error loading clients.');
+      setRegistryState('QUERY_FAILED');
+      setError(err?.message || 'Network error while loading authorized clients.');
+      return [];
     } finally {
       setIsLoading(false);
     }
@@ -138,21 +284,27 @@ export function ClientProvider({ children }: { children: ReactNode }) {
   }, [refreshClients]);
 
   const setActiveClient = (client: ClientProfile | null) => {
-    setIsLoading(true);
+    purgeCrossClientCache(activeClient?.id);
     setActiveClientState(client);
     if (typeof window !== 'undefined') {
-      if (client) localStorage.setItem('porchlight_active_client_id', client.id);
-      else localStorage.removeItem('porchlight_active_client_id');
+      if (client) {
+        localStorage.setItem(ACTIVE_CLIENT_STORAGE_KEY, client.id);
+      } else {
+        localStorage.removeItem(ACTIVE_CLIENT_STORAGE_KEY);
+      }
     }
-    setTimeout(() => setIsLoading(false), 50);
   };
 
   const setActiveClientId = (id: string) => {
-    setActiveClient(clientList.find((c) => c.id === id) || null);
+    const found = clientList.find((c) => c.id === id) || null;
+    if (found) {
+      setActiveClient(found);
+    }
   };
 
   const addClient = (newClient: ClientProfile) => {
     setClientList((prev) => [...prev, newClient]);
+    setRegistryState('CLIENTS_AVAILABLE');
     setActiveClient(newClient);
   };
 
@@ -168,7 +320,11 @@ export function ClientProvider({ children }: { children: ReactNode }) {
         addClient,
         refreshClients,
         isLoading,
+        registryState,
         authStatus,
+        currentUser,
+        reportingPeriod,
+        setReportingPeriod,
         error,
       }}
     >
@@ -178,10 +334,5 @@ export function ClientProvider({ children }: { children: ReactNode }) {
 }
 
 export function useClient() {
-  const context = useContext(ClientContext);
-  if (!context) {
-    throw new Error('useClient must be used within a ClientProvider');
-  }
-  return context;
+  return useContext(ClientContext);
 }
-// END OF FILE
