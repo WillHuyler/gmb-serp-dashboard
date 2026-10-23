@@ -3,7 +3,6 @@
 import React, { useState, useEffect, Suspense } from 'react';
 import Link from 'next/link';
 import { useClient } from '../../lib/client-context';
-import GlobalHeader from '../../components/navigation/GlobalHeader';
 import TrustCertificationStrip, {
   DataTrustState,
 } from '../../components/design-system/TrustCertificationStrip';
@@ -13,7 +12,7 @@ import TriPartInsightCard from '../../components/design-system/TriPartInsightCar
 export const dynamic = 'force-dynamic';
 
 function ReputationContent() {
-  const { activeClient } = useClient();
+  const { activeClient, reportingPeriod } = useClient();
   const [metrics, setMetrics] = useState<any | null>(null);
   const [loading, setLoading] = useState(false);
 
@@ -63,32 +62,37 @@ function ReputationContent() {
     : 'UNMAPPED_SETUP';
 
   return (
-    <div className="flex-1 flex flex-col">
+    <div className="flex-1 flex flex-col bg-[#F4F7FB] text-[#0B1F3A]">
       <TrustCertificationStrip
         client={activeClient}
         trustState={trustState}
         lastIngestedAt={metrics?.last_ingested_at}
         recordCount={metrics?.record_count || 0}
+        reportingPeriod={reportingPeriod}
       />
 
-      <main className="flex-1 p-6 max-w-[1600px] w-full mx-auto space-y-6 text-white font-sans">
-        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-[#111622] border border-[#A9C7E5]/15 rounded-xl p-6">
+      <main className="flex-1 p-6 max-w-[1600px] w-full mx-auto space-y-6 font-sans">
+        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-white border border-[#DCE5EF] rounded-xl p-6 shadow-sm">
           <div>
-            <span className="font-mono text-xs uppercase tracking-widest text-[#D99614] font-bold block">
+            <span className="text-xs uppercase tracking-wider text-[#D99614] font-bold block">
               GBP REPUTATION & SENTIMENT TELEMETRY
             </span>
-            <h1 className="text-2xl font-bold tracking-tight text-white mt-1">
+            <h1 className="text-2xl font-extrabold tracking-tight text-[#0B1F3A] mt-1">
               Reputation Intelligence — {activeClient?.name || 'Select Client'}
             </h1>
-            <p className="text-sm text-slate-400 mt-1">
-              GBP Store Code: <span className="font-mono text-slate-200">{activeClient?.store_code || 'Unassigned'}</span> • Location: {activeClient?.address || 'Address pending'}
+            <p className="text-sm text-slate-600 mt-1">
+              GBP Store Code:{' '}
+              <span className="font-mono font-semibold text-[#0B1F3A]">
+                {activeClient?.store_code || 'Unassigned'}
+              </span>{' '}
+              • Location: {activeClient?.address || 'Address pending'}
             </p>
           </div>
 
           {activeClient && (
             <Link
               href={`/connection-center?clientId=${activeClient.id}`}
-              className="px-4 py-2 bg-[#151D2A] hover:bg-[#1C273A] border border-[#A9C7E5]/20 rounded-lg text-xs font-semibold text-slate-200"
+              className="px-4 py-2 bg-[#0B1F3A] hover:bg-[#16325B] text-white rounded-lg text-xs font-bold shadow-sm"
             >
               Verify GBP Location Mapping →
             </Link>
@@ -101,10 +105,13 @@ function ReputationContent() {
             value={metrics?.avg_rating ?? null}
             format="number"
             sourceBadge="GBP • VERIFIED"
-            provenanceNote={activeClient?.store_code ? `Store #${activeClient.store_code}` : 'Unmapped'}
+            provenanceNote={
+              activeClient?.store_code ? `Store #${activeClient.store_code}` : 'Unmapped'
+            }
             isCertified={hasVerifiedReputation}
             isLoading={loading}
             accentHighlight={true}
+            accentColor="gold"
           />
 
           <KpiMetricCard
@@ -116,6 +123,7 @@ function ReputationContent() {
             provenanceNote="Cumulative Count"
             isCertified={hasVerifiedReputation}
             isLoading={loading}
+            accentColor="blue"
           />
 
           <KpiMetricCard
@@ -126,6 +134,7 @@ function ReputationContent() {
             provenanceNote="30-Day Review Gain"
             isCertified={hasVerifiedReputation}
             isLoading={loading}
+            accentColor="teal"
           />
 
           <KpiMetricCard
@@ -136,6 +145,7 @@ function ReputationContent() {
             provenanceNote="Replied / Total"
             isCertified={hasVerifiedReputation}
             isLoading={loading}
+            accentColor="violet"
           />
         </div>
 
@@ -165,13 +175,8 @@ function ReputationContent() {
 
 export default function ReputationPage() {
   return (
-    <div className="min-h-screen bg-[#0B0F17] text-white flex flex-col font-sans">
-      <Suspense fallback={<div className="p-6 text-xs text-slate-400">Loading Header...</div>}>
-        <GlobalHeader />
-      </Suspense>
-      <Suspense fallback={<div className="p-6 text-xs text-slate-400">Loading Reputation...</div>}>
-        <ReputationContent />
-      </Suspense>
-    </div>
+    <Suspense fallback={<div className="p-6 text-xs text-slate-500">Loading Reputation...</div>}>
+      <ReputationContent />
+    </Suspense>
   );
 }
