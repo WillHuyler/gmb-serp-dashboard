@@ -1,78 +1,209 @@
 'use client';
 
-import React, { Suspense } from 'react';
+import React, { useState, useEffect, Suspense } from 'react';
+import Link from 'next/link';
+import { useSearchParams } from 'next/navigation';
 import { useClient } from '../../lib/client-context';
+import GlobalHeader from '../../components/navigation/GlobalHeader';
+import TrustCertificationStrip, {
+  DataTrustState,
+} from '../../components/design-system/TrustCertificationStrip';
+import KpiMetricCard from '../../components/design-system/KpiMetricCard';
+import TriPartInsightCard from '../../components/design-system/TriPartInsightCard';
 
 export const dynamic = 'force-dynamic';
 
 function PaidMediaContent() {
+  const searchParams = useSearchParams();
   const { activeClient } = useClient();
-  const hasAdsMapping = Boolean(activeClient?.mappings?.google_ads_id || activeClient?.mappings?.meta_act_id);
+  const [metrics, setMetrics] = useState<any | null>(null);
+  const [loading, setLoading] = useState(false);
+
+  const startDate = searchParams.get('startDate') || '2026-09-01';
+  const endDate = searchParams.get('endDate') || '2026-09-30';
+  const isCertified = Boolean(activeClient?.is_certified);
+
+  useEffect(() => {
+    if (!activeClient?.id) {
+      setMetrics(null);
+      return;
+    }
+
+    let cancelled = false;
+    async function loadPaidTelemetry() {
+      setLoading(true);
+      try {
+        const res = await fetch(
+          `/api/telemetry/aggregate?clientId=${encodeURIComponent(
+            activeClient!.id
+          )}&startDate=${encodeURIComponent(startDate)}&endDate=${encodeURIComponent(endDate)}`,
+          { credentials: 'include', headers: { 'Cache-Control': 'no-cache' } }
+        );
+        const data = await res.json();
+        if (!cancelled) {
+          setMetrics(res.ok && data.success ? data.metrics : null);
+        }
+      } catch {
+        if (!cancelled) setMetrics(null);
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    }
+
+    loadPaidTelemetry();
+    return () => {
+      cancelled = true;
+    };
+  }, [activeClient?.id, startDate, endDate]);
+
+  const hasVerifiedPaid = Boolean(
+    isCertified && metrics && metrics.record_count > 0 && typeof metrics.total_spend === 'number'
+  );
+
+  // Strict CPL denominator guard: never compute CPL if conversions <= 0
+  const verifiedConversions =
+    hasVerifiedPaid && typeof metrics?.total_conversions === 'number'
+      ? metrics.total_conversions
+      : null;
+
+  const verifiedCpl =
+    hasVerifiedPaid &&
+    typeof metrics?.total_spend === 'number' &&
+    typeof verifiedConversions === 'number' &&
+    verifiedConversions > 0
+      ? metrics.total_spend / verifiedConversions
+      : null;
+
+  const trustState: DataTrustState = loading
+    ? 'SECTION_LOADING'
+    : hasVerifiedPaid
+    ? 'CERTIFIED_LIVE'
+    : activeClient?.mappings?.google_ads_id || activeClient?.mappings?.meta_act_id
+    ? 'MAPPED_PENDING_SYNC'
+    : 'UNMAPPED_SETUP';
 
   return (
-    <div className="p-8 space-y-6 bg-[#0B0F17] text-white min-h-screen font-sans">
-      <div className="flex justify-between items-center border-b border-[#A9C7E5]/10 pb-6">
-        <div>
-          <span className="text-[10px] font-mono uppercase tracking-widest text-[#D99614] font-bold block">
-            PAID MEDIA PERFORMANCE
-          </span>
-          <h1 className="text-2xl font-bold tracking-tight text-white mt-1">
-            {activeClient?.name || 'Active Client'}
-          </h1>
-        </div>
+    <div className="flex-1 flex flex-col">
+      <TrustCertificationStrip
+        client={activeClient}
+        trustState={trustState}
+        lastIngestedAt={metrics?.last_ingested_at}
+        recordCount={metrics?.record_count || 0}
+        reportingPeriod={{ startDate, endDate }}
+      />
 
-        <span className={`px-3 py-1 rounded text-xs font-mono font-bold border ${
-          hasAdsMapping
-            ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'
-            : 'bg-amber-500/10 text-amber-400 border-amber-500/20'
-        }`}>
-          {hasAdsMapping ? 'PAID MEDIA CONNECTED ✓' : 'UNMAPPED / DATA UNAVAILABLE'}
-        </span>
-      </div>
-
-      {!hasAdsMapping ? (
-        <div className="bg-[#111622] border border-[#A9C7E5]/10 rounded-xl p-12 text-center space-y-4 max-w-xl mx-auto mt-12">
-          <div className="w-12 h-12 bg-amber-500/10 border border-amber-500/30 rounded-full flex items-center justify-center mx-auto text-xl text-amber-400">
-            🎯
-          </div>
+      <main className="flex-1 p-6 max-w-[1600px] w-full mx-auto space-y-6 text-white font-sans">
+        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-[#111622] border border-[#A9C7E5]/15 rounded-xl p-6">
           <div>
-            <h3 className="text-sm font-bold font-mono text-white uppercase tracking-wider">
-              GOOGLE ADS / META DATA UNAVAILABLE
-            </h3>
-            <p className="text-xs text-slate-400 mt-1 font-mono">
-              No verified ad customer account is mapped to <strong className="text-white">{activeClient?.name}</strong>. Data is kept fail-closed until an explicit mapping is confirmed.
+            <span className="font-mono text-xs uppercase tracking-widest text-[#D99614] font-bold block">
+              PAID ACQUISITION TELEMETRY • GOOGLE ADS & META ADS
+            </span>
+            <h1 className="text-2xl font-bold tracking-tight text-white mt-1">
+              Paid Media Performance — {activeClient?.name || 'Select Client'}
+            </h1>
+            <p className="text-sm text-slate-400 mt-1">
+              Google Ads ID: <span className="font-mono text-slate-200">{activeClient?.mappings?.google_ads_id || 'Unmapped'}</span> • Meta Ad Account: <span className="font-mono text-slate-200">{activeClient?.mappings?.meta_act_id || 'Unmapped'}</span>
             </p>
           </div>
-          <a
-            href="/connection-center"
-            className="inline-block bg-amber-500/20 border border-amber-500/40 text-amber-300 text-xs font-mono font-bold px-4 py-2 rounded hover:bg-amber-500/30 transition-all"
-          >
-            Configure Account Mappings →
-          </a>
+
+          {activeClient && (
+            <Link
+              href={`/connection-center?clientId=${activeClient.id}`}
+              className="px-4 py-2 bg-[#151D2A] hover:bg-[#1C273A] border border-[#A9C7E5]/20 rounded-lg text-xs font-semibold text-slate-200"
+            >
+              Manage Ad Account Mappings →
+            </Link>
+          )}
         </div>
-      ) : (
-        <div className="bg-[#111622] border border-[#A9C7E5]/10 rounded-xl p-6 space-y-4">
-          <h3 className="text-xs font-mono font-bold text-white uppercase tracking-wider">ACTIVE AD ACCOUNTS</h3>
-          <div className="space-y-2 text-xs font-mono">
-            <div className="flex justify-between">
-              <span className="text-slate-400">Google Ads Customer ID:</span>
-              <span className="text-white font-bold">{activeClient?.mappings?.google_ads_id || 'NONE'}</span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-slate-400">Meta Ads Account ID:</span>
-              <span className="text-white font-bold">{activeClient?.mappings?.meta_act_id || 'NONE'}</span>
-            </div>
-          </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          <KpiMetricCard
+            label="Verified Ad Spend"
+            value={metrics?.total_spend}
+            previousValue={metrics?.prev_total_spend}
+            format="currency"
+            sourceBadge="GOOGLE + META"
+            provenanceNote={activeClient?.mappings?.google_ads_id || 'Unmapped'}
+            isCertified={hasVerifiedPaid}
+            isLoading={loading}
+          />
+
+          <KpiMetricCard
+            label="Paid Clicks"
+            value={metrics?.paid_clicks ?? null}
+            previousValue={metrics?.prev_paid_clicks ?? null}
+            format="number"
+            sourceBadge="PAID TRAFFIC"
+            provenanceNote="Verified Ad Clicks"
+            isCertified={hasVerifiedPaid}
+            isLoading={loading}
+          />
+
+          <KpiMetricCard
+            label="Verified Conversions"
+            value={verifiedConversions}
+            previousValue={metrics?.prev_total_conversions ?? null}
+            format="number"
+            sourceBadge="CONVERSIONS"
+            provenanceNote="Qualified Leads"
+            isCertified={hasVerifiedPaid}
+            isLoading={loading}
+            accentHighlight={true}
+          />
+
+          <KpiMetricCard
+            label="Blended Cost Per Lead"
+            value={verifiedCpl}
+            format="currency"
+            invertDeltaPolarity={true}
+            sourceBadge="CPL GUARDED"
+            provenanceNote={verifiedConversions && verifiedConversions > 0 ? 'Spend / Leads' : 'Requires >0 Leads'}
+            isCertified={Boolean(hasVerifiedPaid && verifiedCpl !== null)}
+            isLoading={loading}
+          />
         </div>
-      )}
+
+        <TriPartInsightCard
+          title="Paid Search & Paid Social Efficiency Audit"
+          category="PAID MEDIA ATTRIBUTION"
+          confidence={hasVerifiedPaid ? 'HIGH' : 'INSUFFICIENT_DATA'}
+          sources={hasVerifiedPaid ? ['GOOGLE_ADS', 'META_ADS'] : []}
+          whatIsHappening={
+            hasVerifiedPaid
+              ? `${activeClient?.name} invested $${metrics.total_spend.toLocaleString()} across verified paid media channels during ${startDate} – ${endDate}.`
+              : `No certified paid media spend or conversion records exist for ${activeClient?.name || 'this client'} in the selected window.`
+          }
+          whyItIsHappening={
+            hasVerifiedPaid
+              ? 'Cost per lead is strictly calculated only when verified conversion volume is greater than zero.'
+              : 'Google Ads customer ID or Meta Ad Account ID is either unmapped in Connection Center or awaiting initial ingestion.'
+          }
+          whatToDoNext={
+            hasVerifiedPaid
+              ? 'Align paid search location bid adjustments with weak outer-ring nodes identified in OtterWatch 5×5 Geo-Grid.'
+              : 'Map the client’s Google Ads and Meta Ads accounts in Connection Center to enable verified paid attribution.'
+          }
+          actionLabel={hasVerifiedPaid ? 'Simulate Budget in Opportunity Lab' : 'Map Ad Accounts'}
+          actionHref={
+            hasVerifiedPaid
+              ? `/outcome-lab?clientId=${activeClient?.id || ''}`
+              : `/connection-center?clientId=${activeClient?.id || ''}`
+          }
+        />
+      </main>
     </div>
   );
 }
 
 export default function PaidMediaPage() {
   return (
-    <Suspense fallback={<div className="p-8 text-xs font-mono text-slate-400">Loading Paid Media...</div>}>
-      <PaidMediaContent />
-    </Suspense>
+    <div className="min-h-screen bg-[#0B0F17] text-white flex flex-col font-sans">
+      <Suspense fallback={<div className="p-6 text-xs text-slate-400">Loading Header...</div>}>
+        <GlobalHeader />
+      </Suspense>
+      <Suspense fallback={<div className="p-6 text-xs text-slate-400">Loading Paid Media...</div>}>
+        <PaidMediaContent />
+      </Suspense>
+    </div>
   );
 }
