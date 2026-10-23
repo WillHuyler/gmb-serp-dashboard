@@ -280,4 +280,65 @@ export async function validateClientAccess(
       };
     }
 
-    if (requestedTenantId && client
+    if (requestedTenantId && clientRow.tenant_id !== requestedTenantId) {
+      const errRes = NextResponse.json(
+        {
+          success: false,
+          error: {
+            code: 'TENANT_MISMATCH',
+            message: 'Client does not belong to the requested tenant.',
+          },
+        },
+        { status: 403 }
+      );
+      return {
+        authorized: false,
+        errorResponse: errRes,
+        response: errRes,
+      };
+    }
+
+    if (!authCheck.context.authorizedTenantIds.includes(clientRow.tenant_id)) {
+      const errRes = NextResponse.json(
+        {
+          success: false,
+          error: {
+            code: 'CROSS_TENANT_DENIED',
+            message: 'Cross-tenant client access is strictly forbidden.',
+          },
+        },
+        { status: 403 }
+      );
+      return {
+        authorized: false,
+        errorResponse: errRes,
+        response: errRes,
+      };
+    }
+
+    return {
+      authorized: true,
+      supabase,
+      context: {
+        ...authCheck.context,
+        tenantId: clientRow.tenant_id,
+      },
+    };
+  } catch (err: any) {
+    const errRes = NextResponse.json(
+      {
+        success: false,
+        error: {
+          code: 'CLIENT_ACCESS_CHECK_FAILED',
+          message: err?.message || 'Error validating client access.',
+        },
+      },
+      { status: 500 }
+    );
+    return {
+      authorized: false,
+      errorResponse: errRes,
+      response: errRes,
+    };
+  }
+}
