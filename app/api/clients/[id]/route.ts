@@ -1,92 +1,206 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { validateClientAccess } from '../../../../lib/auth-guard';
-import { evaluateClientDataProvenance, resolveConfirmedClientMappings } from '../../../../lib/data-certification';
-import type { ClientProfile } from '../../../../lib/client-context';
+import { validateClientAccess, getServerSupabaseClient } from '../../../../lib/auth-guard';
+import {
+  normalizeVerifiedClientRecord,
+  JoinedAccountMapping,
+  RawIntegrationAccountRow,
+} from '../../../../lib/client-row-normalizer';
 
 export const dynamic = 'force-dynamic';
 
-export async function GET(req: NextRequest, { params }: { params: { id: string } }) {
+const VERIFIED_CLIENT_COLUMNS =
+  'id, name, store_code, address, created_at, organization_id, tenant_id, data_certification_status, domain, is_certified';
+
+async function loadJoinedRelations(
+  supabase: any,
+  tenantId: string,
+  clientId: string
+): Promise<{
+  joinedMappings: JoinedAccountMapping[];
+  integrationAccounts: RawIntegrationAccountRow[];
+  hasTelemetry: boolean;
+}> {
+  const [mapRes, intAccRes, metricsRes] = await Promise.all([
+    supabase
+      .from('account_mappings')
+      .select('id, tenant_id, client_id, external_account_id, mapping_role, mapping_confidence, is_confirmed, include_in_command_center, created_at')
+      .eq('client_id', clientId)
+      .eq('tenant_id', tenantId),
+    supabase
+      .from('integration_accounts')
+      .select('id, tenant_id, client_id, provider, provider_account_id, auth_status, last_sync_at, last_success_sync_at, sync_error_message, created_at')
+      .eq('client_id', clientId)
+      .eq('tenant_id', tenantId),
+    supabase
+      .from('daily_client_metrics')
+      .select('client_id')
+      .eq('client_id', clientId)
+      .limit(1),
+  ]);
+
+  const rawMappings = mapRes.data || [];
+  const extIds = rawMappings.map((m: any) => m.external_account_id).filter(Boolean);
+
+  const externalMap = new Map<string, any>();
+  if (extIds.length > 0) {
+    const { data: extRows } = await supabase
+      .from('external_accounts')
+      .select('id, connection_id, provider, external_account_id, descriptive_name, account_type, status, tenant_id')
+      .in('id', extIds);
+    (extRows || []).forEach((e: any) => externalMap.set(e.id, e));
+  }
+
+  const joinedMappings: JoinedAccountMapping[] = rawMappings.map((m: any) => ({
+    ...m,
+    external_account: externalMap.get(m.external_account_id) || null,
+  }));
+
+  return {
+    joinedMappings,
+    integrationAccounts: (intAccRes.data || []) as RawIntegrationAccountRow[],
+    hasTelemetry: (metricsRes.data || []).length > 0,
+  };
+}
+
+export async function GET(
+  req: NextRequest,
+  { params }: { params: { id: string } }
+) {
   const clientId = params.id;
-  const auth = await validateClientAccess(req, clientId);
-  if (!auth.authorized || !auth.supabase || !auth.context) return auth.errorResponse!;
+  const authCheck = await validateClientAccess(req, clientId, true);
+  if (!authCheck.authorized || !authCheck.context) {
+    return authCheck.errorResponse!;
+  }
 
   try {
-    const [rowRes, mapRes, extRes, connRes, dmRes] = await Promise.all([
-      auth.supabase.from('clients').select('id, name, store_code, address, domain, tenant_id, is_certified, data_certification_status').eq('id', clientId).single(),
-      auth.supabase.from('account_mappings').select('id, tenant_id, client_id, external_account_id, mapping_role, mapping_confidence, is_confirmed, include_in_command_center, created_at').eq('client_id', clientId).eq('tenant_id', auth.context.tenantId),
-      auth.supabase.from('external_accounts').select('id, tenant_id, connection_id, provider, external_account_id, descriptive_name, status').eq('tenant_id', auth.context.tenantId),
-      auth.supabase.from('provider_connections').select('id, status').eq('tenant_id', auth.context.tenantId),
-      auth.supabase.from('daily_metrics').select('metric_date').eq('client_id', clientId).order('metric_date', { ascending: false }).limit(1),
-    ]);
+    const supabase = getServerSupabaseClient(req);
+    const { data: clientRow, error: clientErr } = await supabase
+      .from('clients')
+      .select(VERIFIED_CLIENT_COLUMNS)
+      .eq('id', clientId)
+      .eq('tenant_id', authCheck.context.tenantId)
+      .single();
 
-    if (rowRes.error || !rowRes.data || mapRes.error || extRes.error || connRes.error || dmRes.error) {
-      return NextResponse.json({ success: false, error: 'CLIENT_QUERY_FAILED' }, { status: 500 });
+    if (clientErr || !clientRow) {
+      return NextResponse.json(
+        { success: false, error: { code: 'CLIENT_NOT_FOUND', message: 'Client record not found.' } },
+        { status: 404 }
+      );
     }
 
-    const row = rowRes.data;
-    const resolvedMaps = resolveConfirmedClientMappings(row.id, row.tenant_id, mapRes.data || [], extRes.data || []);
-    const activeConns = (connRes.data || []).filter((c: any) => c.status === 'ACTIVE' || c.status === 'CONNECTED' || c.status === 'HEALTHY').length;
-    const latestDate = dmRes.data?.[0]?.metric_date || null;
+    const { joinedMappings, integrationAccounts, hasTelemetry } = await loadJoinedRelations(
+      supabase,
+      authCheck.context.tenantId,
+      clientId
+    );
 
-    const prov = evaluateClientDataProvenance({
-      dbIsCertifiedFlag: Boolean(row.is_certified),
-      mappedAccountsCount: resolvedMaps.length,
-      verifiedConnectionsCount: activeConns,
-      dailyMetricsCount: (dmRes.data || []).length,
-      platformMetricsCount: 0,
-      keywordRowsCount: 0,
-      latestMetricDate: latestDate,
+    return NextResponse.json({
+      success: true,
+      client: normalizeVerifiedClientRecord(
+        clientRow,
+        joinedMappings,
+        integrationAccounts,
+        hasTelemetry
+      ),
     });
-
-    const clientProfile: ClientProfile = {
-      id: row.id,
-      tenant_id: row.tenant_id,
-      name: row.name,
-      store_code: row.store_code || null,
-      address: row.address || null,
-      domain: row.domain || null,
-      timezone: 'America/New_York',
-      currency: 'USD',
-      status: prov.isCertified ? 'active' : 'onboarding',
-      is_certified: prov.isCertified,
-      certification_state: prov.certificationState,
-      has_historical_data: prov.hasHistoricalData,
-      latest_metric_date: prov.latestMetricDate,
-      staleness_days: prov.stalenessDays,
-      provenance_reason: prov.reason,
-      data_certification_status: row.data_certification_status || 'DATA_REVIEW_REQUIRED',
-      type: row.name === 'ABC Motors' ? 'TEST' : 'REAL',
-      mapped_resource_count: resolvedMaps.length,
-      mapped_accounts_count: resolvedMaps.length,
-      verified_providers_count: activeConns,
-      service_areas: [],
-      mappings: {},
-    };
-
-    return NextResponse.json({ success: true, client: clientProfile });
   } catch (err: any) {
-    return NextResponse.json({ success: false, error: err.message || 'CLIENT_FETCH_ERROR' }, { status: 500 });
+    return NextResponse.json(
+      { success: false, error: { code: 'CLIENT_FETCH_ERROR', message: err.message } },
+      { status: 500 }
+    );
   }
 }
 
-export async function PATCH(req: NextRequest, { params }: { params: { id: string } }) {
+export async function PATCH(
+  req: NextRequest,
+  { params }: { params: { id: string } }
+) {
   const clientId = params.id;
-  const auth = await validateClientAccess(req, clientId);
-  if (!auth.authorized || !auth.supabase) return auth.errorResponse!;
+  const authCheck = await validateClientAccess(req, clientId, true);
+  if (!authCheck.authorized || !authCheck.context) {
+    return authCheck.errorResponse!;
+  }
 
   try {
     const body = await req.json();
-    const updates: Record<string, any> = {};
-    if (typeof body.name === 'string' && body.name.trim()) updates.name = body.name.trim();
-    if (body.address !== undefined) updates.address = body.address;
-    if (body.domain !== undefined) updates.domain = body.domain;
-    if (body.store_code !== undefined) updates.store_code = body.store_code;
+    const { name, address, domain, store_code, organization_id } = body || {};
 
-    const { data, error } = await auth.supabase.from('clients').update(updates).eq('id', clientId).select().single();
-    if (error || !data) return NextResponse.json({ success: false, error: error?.message || 'UPDATE_FAILED' }, { status: 400 });
-    return NextResponse.json({ success: true, client: data });
+    const updatePayload: Record<string, any> = {};
+
+    if (typeof name === 'string') {
+      if (name.trim().length < 2) {
+        return NextResponse.json(
+          { success: false, error: { code: 'INVALID_NAME', message: 'Client name must be at least 2 characters.' } },
+          { status: 400 }
+        );
+      }
+      updatePayload.name = name.trim();
+    }
+
+    if (address !== undefined) {
+      updatePayload.address = typeof address === 'string' && address.trim() !== '' ? address.trim() : null;
+    }
+
+    if (domain !== undefined) {
+      updatePayload.domain = typeof domain === 'string' && domain.trim() !== '' ? domain.trim() : null;
+    }
+
+    if (store_code !== undefined) {
+      updatePayload.store_code = typeof store_code === 'string' && store_code.trim() !== '' ? store_code.trim() : null;
+    }
+
+    if (organization_id !== undefined) {
+      updatePayload.organization_id = typeof organization_id === 'string' && organization_id.trim() !== '' ? organization_id.trim() : null;
+    }
+
+    if (Object.keys(updatePayload).length === 0) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: {
+            code: 'EMPTY_UPDATE',
+            message: 'No valid public.clients schema fields provided (name, address, domain, store_code, organization_id).',
+          },
+        },
+        { status: 400 }
+      );
+    }
+
+    const supabase = getServerSupabaseClient(req);
+    const { data: updated, error: updateErr } = await supabase
+      .from('clients')
+      .update(updatePayload)
+      .eq('id', clientId)
+      .eq('tenant_id', authCheck.context.tenantId)
+      .select(VERIFIED_CLIENT_COLUMNS)
+      .single();
+
+    if (updateErr || !updated) {
+      return NextResponse.json(
+        { success: false, error: { code: 'CLIENT_UPDATE_FAILED', message: updateErr?.message || 'Update failed.' } },
+        { status: 500 }
+      );
+    }
+
+    const { joinedMappings, integrationAccounts, hasTelemetry } = await loadJoinedRelations(
+      supabase,
+      authCheck.context.tenantId,
+      clientId
+    );
+
+    return NextResponse.json({
+      success: true,
+      client: normalizeVerifiedClientRecord(
+        updated,
+        joinedMappings,
+        integrationAccounts,
+        hasTelemetry
+      ),
+    });
   } catch (err: any) {
-    return NextResponse.json({ success: false, error: err.message || 'INTERNAL_SERVER_ERROR' }, { status: 500 });
+    return NextResponse.json(
+      { success: false, error: { code: 'CLIENT_PATCH_ERROR', message: err.message } },
+      { status: 500 }
+    );
   }
 }
-// EOF
