@@ -3,7 +3,6 @@
 import React, { useState, useEffect, Suspense, useCallback } from 'react';
 import Link from 'next/link';
 import { useClient } from '../../lib/client-context';
-import GlobalHeader from '../../components/navigation/GlobalHeader';
 import TrustCertificationStrip, {
   DataTrustState,
 } from '../../components/design-system/TrustCertificationStrip';
@@ -47,7 +46,6 @@ function ConnectionCenterContent() {
   const [statusMessage, setStatusMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const [mappingBusyId, setMappingBusyId] = useState<string | null>(null);
 
-  // Manual / Discovered Resource Binding Form
   const [selectedAcId, setSelectedAcId] = useState<string>('');
   const [selectedRole, setSelectedRole] = useState<string>('PRIMARY_MARKETING');
 
@@ -147,39 +145,40 @@ function ConnectionCenterContent() {
   ];
 
   return (
-    <div className="flex-1 flex flex-col">
+    <div className="flex-1 flex flex-col bg-[#F4F7FB] text-[#0B1F3A]">
       <TrustCertificationStrip
         client={activeClient}
         trustState={trustState}
         recordCount={mappings.length}
       />
 
-      <main className="flex-1 p-6 max-w-[1600px] w-full mx-auto space-y-6 text-white font-sans">
+      <main className="flex-1 p-6 max-w-[1600px] w-full mx-auto space-y-6 font-sans">
         {/* Page Header */}
-        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-[#111622] border border-[#A9C7E5]/15 rounded-xl p-6">
+        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-white border border-[#DCE5EF] rounded-xl p-6 shadow-sm">
           <div>
-            <span className="font-mono text-xs uppercase tracking-widest text-[#D99614] font-bold block">
-              INTEGRATION GOVERNANCE & RESOURCE MAPPING HUB
+            <span className="text-xs uppercase tracking-wider text-[#D99614] font-bold block">
+              INTEGRATION GOVERNANCE & RESOURCE MAPPING WIZARD
             </span>
-            <h1 className="text-2xl font-bold tracking-tight text-white mt-1">
+            <h1 className="text-2xl font-extrabold tracking-tight text-[#0B1F3A] mt-1">
               Connection Center — {clientLoading ? 'Loading...' : activeClient?.name || 'Select Client'}
             </h1>
-            <p className="text-sm text-slate-400 mt-1">
+            <p className="text-sm text-slate-600 mt-1">
               Discover authorized external accounts, enforce blue-badge GBP verification, and explicitly bind provider resources to {activeClient?.name || 'the selected client'}.
             </p>
           </div>
 
           <div className="flex items-center gap-3">
             <button
+              type="button"
               onClick={() => loadClientConnections()}
-              className="px-3.5 py-2 bg-[#151D2A] hover:bg-[#1C273A] border border-[#A9C7E5]/20 rounded-lg text-xs font-semibold text-slate-200 transition-all"
+              className="px-4 py-2 bg-[#F4F7FB] hover:bg-slate-200 border border-[#DCE5EF] rounded-lg text-xs font-bold text-[#0B1F3A] transition-all"
             >
               Refresh Mappings
             </button>
             {activeClient && (
               <Link
                 href={`/command-center?clientId=${activeClient.id}`}
-                className="px-4 py-2 bg-[#D99614] hover:bg-[#B97A08] text-[#0B0F17] font-semibold text-xs rounded-lg transition-all"
+                className="px-4 py-2 bg-[#D99614] hover:bg-[#B87D0E] text-[#0B1F3A] font-bold text-xs rounded-lg transition-all shadow-sm"
               >
                 Open Command Center →
               </Link>
@@ -189,28 +188,28 @@ function ConnectionCenterContent() {
 
         {statusMessage && (
           <div
-            className={`p-4 rounded-xl border text-xs font-mono ${
+            className={`p-4 rounded-xl border text-xs font-semibold ${
               statusMessage.type === 'success'
-                ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-300'
-                : 'bg-rose-500/10 border-rose-500/30 text-rose-300'
+                ? 'bg-emerald-50 border-emerald-300 text-emerald-800'
+                : 'bg-rose-50 border-rose-300 text-rose-800'
             }`}
           >
             {statusMessage.text}
           </div>
         )}
 
-        {/* Certification Integrity Gate Checklist (CR-003 / CR-015 Phase 2) */}
-        <div className="bg-[#111622] border border-[#A9C7E5]/15 rounded-xl p-5 space-y-3">
-          <div className="flex items-center justify-between border-b border-[#A9C7E5]/10 pb-3">
+        {/* Certification Integrity Gate Checklist */}
+        <div className="bg-white border border-[#DCE5EF] rounded-xl p-6 space-y-4 shadow-sm">
+          <div className="flex items-center justify-between border-b border-[#DCE5EF] pb-3">
             <div>
-              <span className="font-mono text-[10px] uppercase text-[#D99614] font-bold block">
+              <span className="text-[11px] uppercase text-[#D99614] font-bold block">
                 FAIL-CLOSED CERTIFICATION GATE (CR-003 / CR-015)
               </span>
-              <h3 className="text-sm font-bold text-white">
+              <h3 className="text-base font-bold text-[#0B1F3A]">
                 Client Data Certification Requirements
               </h3>
             </div>
-            <span className="font-mono text-xs text-slate-400">
+            <span className="text-xs font-medium text-slate-500">
               Mapping creation alone never certifies a client.
             </span>
           </div>
@@ -219,14 +218,16 @@ function ConnectionCenterContent() {
             {certificationChecks.map((chk) => (
               <div
                 key={chk.label}
-                className={`p-3 rounded-lg border text-xs flex items-center justify-between gap-2 ${
+                className={`p-3.5 rounded-xl border text-xs flex items-center justify-between gap-2 ${
                   chk.passed
-                    ? 'bg-emerald-500/10 border-emerald-500/25 text-emerald-300'
-                    : 'bg-[#151D2A] border-[#A9C7E5]/10 text-slate-400'
+                    ? 'bg-emerald-50 border-emerald-200 text-emerald-900 font-semibold'
+                    : 'bg-[#F4F7FB] border-[#DCE5EF] text-slate-600'
                 }`}
               >
-                <span className="font-medium">{chk.label}</span>
-                <span className="font-mono font-bold">{chk.passed ? 'PASS' : 'PENDING'}</span>
+                <span>{chk.label}</span>
+                <span className="font-mono font-bold text-[11px]">
+                  {chk.passed ? 'PASS' : 'PENDING'}
+                </span>
               </div>
             ))}
           </div>
@@ -257,20 +258,20 @@ function ConnectionCenterContent() {
             return (
               <div
                 key={prov.key}
-                className="bg-[#111622] border border-[#A9C7E5]/12 rounded-xl p-5 flex flex-col justify-between space-y-4"
+                className="bg-white border border-[#DCE5EF] border-t-4 border-t-[#0B1F3A] rounded-xl p-5 flex flex-col justify-between space-y-4 shadow-sm"
               >
                 <div className="space-y-2">
                   <div className="flex items-center justify-between">
-                    <span className="font-mono text-[10px] px-2 py-0.5 rounded bg-[#151D2A] border border-[#A9C7E5]/15 text-[#D99614] font-semibold">
+                    <span className="font-mono text-[10px] px-2.5 py-0.5 rounded bg-[#F4F7FB] border border-[#DCE5EF] text-[#0B1F3A] font-bold">
                       {prov.badge}
                     </span>
                     <span
-                      className={`font-mono text-[10px] px-2 py-0.5 rounded border font-semibold ${
+                      className={`font-mono text-[10px] px-2.5 py-0.5 rounded border font-bold ${
                         effectiveResourceId && hasVerifiedTelemetry
-                          ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30'
+                          ? 'bg-emerald-50 text-emerald-800 border-emerald-200'
                           : effectiveResourceId
-                          ? 'bg-sky-500/10 text-sky-400 border-sky-500/30'
-                          : 'bg-amber-500/10 text-amber-400 border-amber-500/30'
+                          ? 'bg-sky-50 text-sky-800 border-sky-200'
+                          : 'bg-amber-50 text-amber-800 border-amber-200'
                       }`}
                     >
                       {effectiveResourceId && hasVerifiedTelemetry
@@ -281,20 +282,21 @@ function ConnectionCenterContent() {
                     </span>
                   </div>
 
-                  <h3 className="text-base font-bold text-white">{prov.label}</h3>
-                  <p className="text-xs font-mono text-slate-400">
-                    Resource ID: <strong className="text-slate-200">{effectiveResourceId || 'None'}</strong>
+                  <h3 className="text-base font-bold text-[#0B1F3A]">{prov.label}</h3>
+                  <p className="text-xs font-mono text-slate-600">
+                    Resource ID:{' '}
+                    <strong className="text-[#0B1F3A]">{effectiveResourceId || 'None'}</strong>
                   </p>
                   {matchedMapping?.external_account?.descriptive_name && (
-                    <p className="text-xs text-slate-300">
+                    <p className="text-xs text-slate-600">
                       Account: {matchedMapping.external_account.descriptive_name}
                     </p>
                   )}
                 </div>
 
-                <div className="pt-3 border-t border-[#A9C7E5]/10 flex items-center justify-between text-xs font-mono text-slate-400">
+                <div className="pt-3 border-t border-[#DCE5EF] flex items-center justify-between text-xs text-slate-500">
                   <span>Role: {matchedMapping?.mapping_role || 'PRIMARY_MARKETING'}</span>
-                  <span className="text-slate-300">
+                  <span className="font-semibold text-[#0B1F3A]">
                     {matchedMapping?.is_confirmed ? '✓ Confirmed' : 'Awaiting Binding'}
                   </span>
                 </div>
@@ -303,43 +305,43 @@ function ConnectionCenterContent() {
           })}
         </div>
 
-        {/* Explicit Resource Mapping Form (Persists to public.account_mappings) */}
-        <div className="bg-[#111622] border border-[#A9C7E5]/15 rounded-xl p-6 space-y-4">
+        {/* Discovered Account Selection & Binding Wizard */}
+        <div className="bg-white border border-[#DCE5EF] rounded-xl p-6 space-y-4 shadow-sm">
           <div>
-            <span className="font-mono text-[10px] uppercase text-[#D99614] font-bold block">
-              EXPLICIT RESOURCE MAPPING (public.account_mappings)
+            <span className="text-[11px] uppercase text-[#D99614] font-bold block">
+              DISCOVERED RESOURCE BINDING WIZARD
             </span>
-            <h3 className="text-base font-bold text-white mt-0.5">
-              Bind Discovered External Account to {activeClient?.name || 'Active Client'}
+            <h3 className="text-base font-bold text-[#0B1F3A] mt-0.5">
+              Bind Authorized External Account to {activeClient?.name || 'Active Client'}
             </h3>
-            <p className="text-xs text-slate-400 mt-0.5">
-              Enter a discovered External Account UUID or Provider Account ID from <code className="font-mono text-slate-200">public.external_accounts</code> (e.g., <code className="font-mono text-[#D99614]">842-192-3049</code> or <code className="font-mono text-[#D99614]">act_9482019482</code>).
+            <p className="text-xs text-slate-600 mt-0.5">
+              Select a discovered account from <code className="font-mono text-[#0B1F3A]">public.external_accounts</code> or enter a verified provider resource identifier.
             </p>
           </div>
 
           <form onSubmit={handleBindExternalAccount} className="grid grid-cols-1 md:grid-cols-12 gap-4 items-end">
             <div className="md:col-span-6">
-              <label className="block text-xs font-medium text-slate-300 mb-1">
-                Discovered External Account ID / UUID *
+              <label className="block text-xs font-bold text-[#0B1F3A] mb-1">
+                Discovered Provider Resource *
               </label>
               <input
                 type="text"
                 required
                 value={selectedAcId}
                 onChange={(e) => setSelectedAcId(e.target.value)}
-                placeholder="e.g., 842-192-3049 or 11111111-1111-1111-1111-111111111111"
-                className="w-full bg-[#151D2A] border border-[#A9C7E5]/20 rounded-lg px-3.5 py-2 text-sm text-white font-mono focus:outline-none focus:border-[#D99614]"
+                placeholder="Select or enter discovered ID (e.g., 842-192-3049 or act_9482019482)"
+                className="w-full bg-[#F4F7FB] border border-[#DCE5EF] rounded-lg px-3.5 py-2 text-sm text-[#0B1F3A] font-mono focus:outline-none focus:ring-2 focus:ring-[#D99614]"
               />
             </div>
 
             <div className="md:col-span-4">
-              <label className="block text-xs font-medium text-slate-300 mb-1">
+              <label className="block text-xs font-bold text-[#0B1F3A] mb-1">
                 Mapping Role
               </label>
               <select
                 value={selectedRole}
                 onChange={(e) => setSelectedRole(e.target.value)}
-                className="w-full bg-[#151D2A] border border-[#A9C7E5]/20 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-[#D99614]"
+                className="w-full bg-[#F4F7FB] border border-[#DCE5EF] rounded-lg px-3 py-2 text-sm text-[#0B1F3A] font-semibold focus:outline-none focus:ring-2 focus:ring-[#D99614]"
               >
                 <option value="PRIMARY_MARKETING">PRIMARY_MARKETING</option>
                 <option value="LOCATION">LOCATION</option>
@@ -352,7 +354,7 @@ function ConnectionCenterContent() {
               <button
                 type="submit"
                 disabled={!activeClient || Boolean(mappingBusyId)}
-                className="w-full py-2 px-4 bg-[#D99614] hover:bg-[#B97A08] disabled:opacity-50 text-[#0B0F17] font-semibold text-xs rounded-lg transition-all"
+                className="w-full py-2.5 px-4 bg-[#D99614] hover:bg-[#B87D0E] disabled:opacity-50 text-[#0B1F3A] font-bold text-xs rounded-lg transition-all shadow-sm"
               >
                 {mappingBusyId ? 'Binding...' : 'Save Mapping'}
               </button>
@@ -360,7 +362,6 @@ function ConnectionCenterContent() {
           </form>
         </div>
 
-        {/* Tri-Part Governance Guidance */}
         <TriPartInsightCard
           title="Provider Lineage & Certification Governance"
           category="CONNECTION CENTER"
@@ -368,7 +369,7 @@ function ConnectionCenterContent() {
           sources={['SUPABASE_ACCOUNT_MAPPINGS', 'EXTERNAL_ACCOUNTS']}
           whatIsHappening={
             mappings.length > 0
-              ? `${activeClient?.name} has${mappings.length} confirmed row(s) in public.account_mappings.`
+              ? `${activeClient?.name} has ${mappings.length} confirmed row(s) in public.account_mappings.`
               : `${activeClient?.name || 'This client'} currently has 0 confirmed rows in public.account_mappings.`
           }
           whyItIsHappening={
@@ -385,13 +386,8 @@ function ConnectionCenterContent() {
 
 export default function ConnectionCenterPage() {
   return (
-    <div className="min-h-screen bg-[#0B0F17] text-white flex flex-col font-sans">
-      <Suspense fallback={<div className="p-6 text-xs text-slate-400">Loading Header...</div>}>
-        <GlobalHeader />
-      </Suspense>
-      <Suspense fallback={<div className="p-6 text-xs text-slate-400">Loading Connection Center...</div>}>
-        <ConnectionCenterContent />
-      </Suspense>
-    </div>
+    <Suspense fallback={<div className="p-6 text-xs text-slate-500">Loading Connection Center...</div>}>
+      <ConnectionCenterContent />
+    </Suspense>
   );
 }
