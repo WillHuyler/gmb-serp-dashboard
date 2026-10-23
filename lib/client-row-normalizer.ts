@@ -3,12 +3,16 @@ import { ClientProfile, ClientProfileMappings } from './client-context';
 export interface RawClientRow {
   id: string;
   tenant_id: string;
+  organization_id?: string | null;
   name: string;
+  store_code?: string | null;
+  address?: string | null;
   domain?: string | null;
-  timezone?: string | null;
-  currency?: string | null;
+  data_certification_status?: string | null;
   is_certified?: boolean | null;
   created_at?: string | null;
+  timezone?: string | null;
+  currency?: string | null;
 }
 
 export interface JoinedAccountMapping {
@@ -22,59 +26,97 @@ export interface JoinedAccountMapping {
   include_in_command_center?: boolean | null;
   created_at?: string | null;
   external_account?: {
-    id: string;
+    id?: string;
     provider: string;
     external_account_id: string;
-    descriptive_name: string;
+    descriptive_name?: string;
     account_type?: string;
     status?: string;
   } | null;
 }
 
+export interface RawIntegrationAccountRow {
+  id: string;
+  tenant_id: string;
+  client_id: string;
+  provider: string;
+  provider_account_id: string;
+  auth_status?: string | null;
+  last_sync_at?: string | null;
+  last_success_sync_at?: string | null;
+  sync_error_message?: string | null;
+  created_at?: string | null;
+}
+
+function assignProviderMappingKey(
+  mappings: ClientProfileMappings,
+  providerRaw: string,
+  resourceId: string
+) {
+  const p = providerRaw.toLowerCase().trim();
+  if (!resourceId) return;
+
+  if (p === 'google_ads' || p === 'google') {
+    mappings.google_ads_id = resourceId;
+  } else if (p === 'meta_ads' || p === 'meta') {
+    mappings.meta_act_id = resourceId;
+  } else if (p === 'ga4') {
+    mappings.ga4_property_id = resourceId;
+  } else if (p === 'gsc') {
+    mappings.gsc_site_url = resourceId;
+  } else if (p === 'gmb' || p === 'gbp') {
+    mappings.gmb_location_id = resourceId;
+    mappings.gmb_account_id = resourceId;
+  } else if (p === 'brightlocal') {
+    mappings.brightlocal_location_id = resourceId;
+  } else if (p === 'serpapi') {
+    mappings.serpapi_location_key = resourceId;
+  } else if (p === 'bing_webmaster') {
+    mappings.bing_webmaster_site_url = resourceId;
+  } else if (p === 'clarity') {
+    mappings.clarity_project_id = resourceId;
+  }
+}
+
 /**
- * Normalizes a verified public.clients database row and its relational account_mappings
- * + external_accounts into the frontend ClientProfile interface without referencing
- * nonexistent columns on public.clients.
+ * Normalizes a verified database client row and its relational mappings.
+ * Supports both:
+ * - normalizeVerifiedClientRecord(row, joinedMappings, hasVerifiedTelemetry: boolean)
+ * - normalizeVerifiedClientRecord(row, joinedMappings, integrationAccounts: RawIntegrationAccountRow[], hasVerifiedTelemetry: boolean)
  */
 export function normalizeVerifiedClientRecord(
   row: RawClientRow,
   joinedMappings: JoinedAccountMapping[] = [],
-  hasVerifiedTelemetry: boolean = false
+  thirdArg: RawIntegrationAccountRow[] | boolean = [],
+  fourthArg: boolean = false
 ): ClientProfile {
+  const integrationAccounts: RawIntegrationAccountRow[] = Array.isArray(thirdArg)
+    ? thirdArg
+    : [];
+  const hasVerifiedTelemetry: boolean =
+    typeof thirdArg === 'boolean' ? thirdArg : Boolean(fourthArg);
+
   const mappings: ClientProfileMappings = {};
 
   for (const m of joinedMappings) {
     const ext = m.external_account;
-    const providerRaw = String(ext?.provider || '').toLowerCase().trim();
+    const providerRaw = String(ext?.provider || '');
     const providerResourceId = ext?.external_account_id || m.external_account_id;
+    assignProviderMappingKey(mappings, providerRaw, providerResourceId);
+  }
 
-    if (!providerResourceId) continue;
-
-    if (providerRaw === 'google_ads' || providerRaw === 'google') {
-      mappings.google_ads_id = providerResourceId;
-    } else if (providerRaw === 'meta_ads' || providerRaw === 'meta') {
-      mappings.meta_act_id = providerResourceId;
-    } else if (providerRaw === 'ga4') {
-      mappings.ga4_property_id = providerResourceId;
-    } else if (providerRaw === 'gsc') {
-      mappings.gsc_site_url = providerResourceId;
-    } else if (providerRaw === 'gmb' || providerRaw === 'gbp') {
-      mappings.gmb_location_id = providerResourceId;
-      mappings.gmb_account_id = providerResourceId;
-    } else if (providerRaw === 'brightlocal') {
-      mappings.brightlocal_location_id = providerResourceId;
-    } else if (providerRaw === 'serpapi') {
-      mappings.serpapi_location_key = providerResourceId;
-    } else if (providerRaw === 'bing_webmaster') {
-      mappings.bing_webmaster_site_url = providerResourceId;
-    } else if (providerRaw === 'clarity') {
-      mappings.clarity_project_id = providerResourceId;
+  let latestSyncAt: string | null = null;
+  for (const ia of integrationAccounts) {
+    assignProviderMappingKey(mappings, ia.provider || '', ia.provider_account_id || '');
+    const syncCandidate = ia.last_success_sync_at || ia.last_sync_at;
+    if (syncCandidate && (!latestSyncAt || syncCandidate > latestSyncAt)) {
+      latestSyncAt = syncCandidate;
     }
   }
 
-  const mappedKeysCount = joinedMappings.length;
+  const mappedKeysCount = Object.values(mappings).filter(Boolean).length;
 
-  // CR-003: Certification requires DB certification flag + valid mapping + verified telemetry
+  // CR-003: Certification requires DB is_certified flag + at least 1 valid mapping + verified telemetry
   const isCertified = Boolean(
     row.is_certified === true && mappedKeysCount > 0 && hasVerifiedTelemetry
   );
@@ -82,15 +124,19 @@ export function normalizeVerifiedClientRecord(
   return {
     id: row.id,
     tenant_id: row.tenant_id,
+    organization_id: row.organization_id || undefined,
     name: row.name || 'Unnamed Client',
+    store_code: row.store_code || undefined,
+    address: row.address || undefined,
     domain: row.domain || undefined,
-    timezone: row.timezone || 'America/New_York',
-    currency: row.currency || 'USD',
+    data_certification_status:
+      row.data_certification_status || (isCertified ? 'CERTIFIED' : 'UNCERTIFIED'),
     status: isCertified ? 'active' : 'onboarding',
     is_certified: isCertified,
-    service_areas: [], // Populated only from verified location telemetry when available
+    service_areas: [],
     mappings,
-    mapped_resource_count: mappedKeysCount,
+    mapped_resource_count: Math.max(joinedMappings.length, mappedKeysCount),
+    last_sync_at: latestSyncAt,
     created_at: row.created_at || undefined,
   };
 }
