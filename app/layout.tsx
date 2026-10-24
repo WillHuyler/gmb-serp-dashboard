@@ -1,13 +1,20 @@
+import type { Metadata } from 'next';
+import { Inter } from 'next/font/google';
 import './globals.css';
-import React from 'react';
 import { ClientProvider } from '../lib/client-context';
 import AppSidebar from '../components/navigation/AppSidebar';
 import ExecutiveTopHeader from '../components/navigation/ExecutiveTopHeader';
 
-export const metadata = {
-  title: 'OtterWatch by PorchLight | Search & SERP Telemetry Engine',
-  description:
-    'Enterprise Local Search, 5x5 Geo-Grid SERP Telemetry, and Multi-Channel Marketing Intelligence.',
+const inter = Inter({ subsets: ['latin'] });
+
+export const metadata: Metadata = {
+  title: 'OtterWatch by PorchLight — Search Intelligence Dashboard',
+  description: 'Enterprise multi-tenant local search, attribution and SERP telemetry platform.',
+  viewport: {
+    width: 'device-width',
+    initialScale: 1,
+    maximumScale: 1,
+  },
 };
 
 export default function RootLayout({
@@ -16,17 +23,19 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en">
-      <body className="bg-[#F4F7FB] text-[#0B1F3A] antialiased font-sans selection:bg-[#D99614]/20">
+    <html lang="en" className="h-full bg-[#F4F7FB]">
+      <body className={`${inter.className} h-full antialiased text-[#0B1F3A]`}>
         <ClientProvider>
-          <div className="min-h-screen flex flex-row bg-[#F4F7FB]">
-            {/* 1. Single Authoritative Dark Navy Sidebar */}
+          <div className="min-h-screen flex flex-row bg-[#F4F7FB] overflow-x-hidden">
+            {/* Desktop Navigation Sidebar (hidden on mobile) */}
             <AppSidebar />
 
-            {/* 2. Single Authoritative Light Executive Viewport */}
-            <div className="flex-1 flex flex-col min-w-0 bg-[#F4F7FB]">
+            {/* Main Application Canvas */}
+            <div className="flex-1 flex flex-col min-w-0 w-full overflow-x-hidden">
               <ExecutiveTopHeader />
-              <div className="flex-1 flex flex-col min-w-0">{children}</div>
+              <main className="flex-1 flex flex-col min-w-0 w-full">
+                {children}
+              </main>
             </div>
           </div>
         </ClientProvider>
