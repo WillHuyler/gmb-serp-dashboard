@@ -38,17 +38,19 @@ export function getUserScopedSupabaseClient(accessToken: string): SupabaseClient
   });
 }
 
+/**
+ * User-facing server Supabase client NEVER falls back to SUPABASE_SERVICE_ROLE_KEY.
+ * Evaluates against the user's JWT so PostgreSQL RLS is enforced.
+ */
 export function getServerSupabaseClient(req?: NextRequest): SupabaseClient {
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
   const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
-  if (!supabaseUrl) {
-    throw new Error('Missing NEXT_PUBLIC_SUPABASE_URL');
+  if (!supabaseUrl || !anonKey) {
+    throw new Error('Missing NEXT_PUBLIC_SUPABASE_URL or NEXT_PUBLIC_SUPABASE_ANON_KEY');
   }
 
-  // Prefer user-scoped JWT when request cookie/header is present so PostgreSQL RLS is enforced end-to-end
-  if (req && anonKey) {
+  if (req) {
     const cookieToken = req.cookies.get('pl-sb-access-token')?.value;
     const headerAuth = req.headers.get('authorization');
     const bearerToken = headerAuth?.startsWith('Bearer ')
@@ -60,285 +62,48 @@ export function getServerSupabaseClient(req?: NextRequest): SupabaseClient {
     }
   }
 
-  if (serviceRoleKey) {
-    return createClient(supabaseUrl, serviceRoleKey, {
-      auth: { persistSession: false, autoRefreshToken: false },
-    });
-  }
-
-  if (anonKey) {
-    return createClient(supabaseUrl, anonKey, {
-      auth: { persistSession: false, autoRefreshToken: false },
-    });
-  }
-
-  throw new Error('Missing Supabase API keys');
+  return createClient(supabaseUrl, anonKey, {
+    auth: { persistSession: false, autoRefreshToken: false },
+  });
 }
 
-export async function resolveAuthenticatedContext(
-  req: NextRequest
-): Promise<AuthGuardResult> {
-  const cookieToken = req.cookies.get('pl-sb-access-token')?.value;
-  const headerAuth = req.headers.get('authorization');
-  const accessToken = headerAuth?.startsWith('Bearer ')
-    ? headerAuth.slice(7).trim()
-    : cookieToken;
+/**
+ * Dedicated Service-Role client restricted strictly to verified background cron jobs.
+ * Requires a matching CRON_SECRET header.
+ */
+export function getAuthorizedCronServiceClient(req: NextRequest): {
+  authorized: boolean;
+  supabase?: SupabaseClient;
+  errorResponse?: NextResponse;
+} {
+  const cronSecret = process.env.CRON_SECRET;
+  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
 
-  if (!accessToken) {
-    const errRes = NextResponse.json(
-      {
-        success: false,
-        error: {
-          code: 'UNAUTHENTICATED',
-          message: 'Authentication required. Please sign in.',
-        },
-      },
-      { status: 401 }
-    );
+  const authHeader = req.headers.get('authorization');
+  const providedSecret = authHeader?.startsWith('Bearer ')
+    ? authHeader.slice(7).trim()
+    : req.headers.get('x-cron-secret');
+
+  if (!cronSecret || !providedSecret || providedSecret !== cronSecret) {
     return {
       authorized: false,
-      errorResponse: errRes,
-      response: errRes,
-    };
-  }
-
-  try {
-    const userSupabase = getUserScopedSupabaseClient(accessToken);
-    const { data: userData, error: userErr } = await userSupabase.auth.getUser(
-      accessToken
-    );
-
-    if (userErr || !userData?.user) {
-      const errRes = NextResponse.json(
+      errorResponse: NextResponse.json(
         {
           success: false,
           error: {
-            code: 'INVALID_SESSION',
-            message: 'Session expired or invalid. Please sign in again.',
+            code: 'UNAUTHORIZED_CRON_INVOCATION',
+            message: 'Valid CRON_SECRET authorization is required for background ETL execution.',
           },
         },
         { status: 401 }
-      );
-      return {
-        authorized: false,
-        errorResponse: errRes,
-        response: errRes,
-      };
-    }
-
-    const userId = userData.user.id;
-    const email = userData.user.email || undefined;
-
-    const [profileRes, membershipsRes, allTenantsRes] = await Promise.all([
-      userSupabase
-        .from('profiles')
-        .select('id, role')
-        .eq('id', userId)
-        .maybeSingle(),
-      userSupabase
-        .from('tenant_memberships')
-        .select('tenant_id, role')
-        .eq('user_id', userId),
-      userSupabase.from('tenants').select('id'),
-    ]);
-
-    const profileRole = String(profileRes.data?.role || '').toLowerCase();
-    const isSuperAdmin =
-      profileRole === 'super_admin' || profileRole === 'platform_super_admin';
-
-    const membershipTenantIds = Array.from(
-      new Set(
-        (membershipsRes.data || [])
-          .map((m: any) => m.tenant_id)
-          .filter(Boolean)
-      )
-    );
-
-    const allVisibleTenantIds = Array.from(
-      new Set((allTenantsRes.data || []).map((t: any) => t.id).filter(Boolean))
-    );
-
-    const authorizedTenantIds = isSuperAdmin
-      ? Array.from(new Set([...membershipTenantIds, ...allVisibleTenantIds]))
-      : membershipTenantIds;
-
-    if (authorizedTenantIds.length === 0) {
-      const errRes = NextResponse.json(
-        {
-          success: false,
-          error: {
-            code: 'NO_TENANT_MEMBERSHIP',
-            message: 'User has no authorized tenant memberships.',
-          },
-        },
-        { status: 403 }
-      );
-      return {
-        authorized: false,
-        errorResponse: errRes,
-        response: errRes,
-      };
-    }
-
-    const preferredTenantId = authorizedTenantIds.includes(
-      '00000000-0000-0000-0000-000000000001'
-    )
-      ? '00000000-0000-0000-0000-000000000001'
-      : authorizedTenantIds[0];
-
-    const effectiveRole = isSuperAdmin
-      ? 'super_admin'
-      : membershipsRes.data?.[0]?.role || profileRole || 'member';
-
-    return {
-      authorized: true,
-      supabase: userSupabase,
-      context: {
-        userId,
-        email,
-        role: effectiveRole,
-        tenantId: preferredTenantId,
-        authorizedTenantIds,
-        accessToken,
-      },
+      ),
     };
-  } catch (err: any) {
-    const errRes = NextResponse.json(
-      {
-        success: false,
-        error: {
-          code: 'AUTH_RESOLUTION_ERROR',
-          message: err?.message || 'Failed to verify authentication context.',
-        },
-      },
-      { status: 500 }
-    );
+  }
+
+  if (!supabaseUrl || !serviceRoleKey) {
     return {
       authorized: false,
-      errorResponse: errRes,
-      response: errRes,
-    };
-  }
-}
-
-export async function validateClientAccess(
-  req: NextRequest,
-  clientId: string | null | undefined,
-  thirdArg?: boolean | string | null
-): Promise<AuthGuardResult> {
-  const authCheck = await resolveAuthenticatedContext(req);
-  if (!authCheck.authorized || !authCheck.context) {
-    return authCheck;
-  }
-
-  if (!clientId) {
-    const errRes = NextResponse.json(
-      {
-        success: false,
-        error: {
-          code: 'MISSING_CLIENT_ID',
-          message: 'A valid clientId is required.',
-        },
-      },
-      { status: 400 }
-    );
-    return {
-      authorized: false,
-      errorResponse: errRes,
-      response: errRes,
-    };
-  }
-
-  const requestedTenantId =
-    typeof thirdArg === 'string' && thirdArg.trim() !== ''
-      ? thirdArg.trim()
-      : null;
-
-  try {
-    const supabase = getUserScopedSupabaseClient(authCheck.context.accessToken);
-    const { data: clientRow, error: clientErr } = await supabase
-      .from('clients')
-      .select('id, tenant_id')
-      .eq('id', clientId)
-      .maybeSingle();
-
-    if (clientErr || !clientRow) {
-      const errRes = NextResponse.json(
+      errorResponse: NextResponse.json(
         {
           success: false,
-          error: {
-            code: 'CLIENT_FORBIDDEN_OR_NOT_FOUND',
-            message: 'Client not found or access denied for this tenant.',
-          },
-        },
-        { status: 403 }
-      );
-      return {
-        authorized: false,
-        errorResponse: errRes,
-        response: errRes,
-      };
-    }
-
-    if (requestedTenantId && clientRow.tenant_id !== requestedTenantId) {
-      const errRes = NextResponse.json(
-        {
-          success: false,
-          error: {
-            code: 'TENANT_MISMATCH',
-            message: 'Client does not belong to the requested tenant.',
-          },
-        },
-        { status: 403 }
-      );
-      return {
-        authorized: false,
-        errorResponse: errRes,
-        response: errRes,
-      };
-    }
-
-    if (!authCheck.context.authorizedTenantIds.includes(clientRow.tenant_id)) {
-      const errRes = NextResponse.json(
-        {
-          success: false,
-          error: {
-            code: 'CROSS_TENANT_DENIED',
-            message: 'Cross-tenant client access is strictly forbidden.',
-          },
-        },
-        { status: 403 }
-      );
-      return {
-        authorized: false,
-        errorResponse: errRes,
-        response: errRes,
-      };
-    }
-
-    return {
-      authorized: true,
-      supabase,
-      context: {
-        ...authCheck.context,
-        tenantId: clientRow.tenant_id,
-      },
-    };
-  } catch (err: any) {
-    const errRes = NextResponse.json(
-      {
-        success: false,
-        error: {
-          code: 'CLIENT_ACCESS_CHECK_FAILED',
-          message: err?.message || 'Error validating client access.',
-        },
-      },
-      { status: 500 }
-    );
-    return {
-      authorized: false,
-      errorResponse: errRes,
-      response: errRes,
-    };
-  }
-}
