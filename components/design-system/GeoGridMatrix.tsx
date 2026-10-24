@@ -1,273 +1,175 @@
 'use client';
 
 import React, { useState } from 'react';
-import Link from 'next/link';
 
 export interface GeoGridNode {
-  nodeIndex: number;
-  row: number;
-  col: number;
-  quadrantLabel: string;
-  latOffsetMiles: number;
-  lngOffsetMiles: number;
+  id: string;
+  gridRow: number;
+  gridCol: number;
   rank: number | null;
-  topCompetitor?: string;
+  lat?: number;
+  lng?: number;
+  label?: string;
 }
-
-interface GeoGridMatrixProps {
-  clientId?: string;
-  clientName: string;
-  centerAddress?: string | null;
-  keyword: string | null;
-  scanTimestamp: string | null;
-  isVerifiedScan: boolean;
-  nodes: GeoGridNode[];
-  compact?: boolean;
-}
-
-const QUADRANT_LABELS = [
-  ['NW Outer Ring', 'North-Northwest', 'North Perimeter', 'North-Northeast', 'NE Outer Ring'],
-  ['West-Northwest', 'NW Inner Sector', 'North Inner Sector', 'NE Inner Sector', 'East-Northeast'],
-  ['West Perimeter', 'West Inner Sector', 'PRIMARY LOCATION CENTER', 'East Inner Sector', 'East Perimeter'],
-  ['West-Southwest', 'SW Inner Sector', 'South Inner Sector', 'SE Inner Sector', 'East-Southeast'],
-  ['SW Outer Ring', 'South-Southwest', 'South Perimeter', 'South-Southeast', 'SE Outer Ring'],
-];
 
 export function buildEmptyGeoGridNodes(): GeoGridNode[] {
-  const list: GeoGridNode[] = [];
-  let idx = 0;
-  for (let r = 0; r < 5; r++) {
-    for (let c = 0; c < 5; c++) {
-      list.push({
-        nodeIndex: idx++,
-        row: r,
-        col: c,
-        quadrantLabel: QUADRANT_LABELS[r][c],
-        latOffsetMiles: (2 - r) * 1.25,
-        lngOffsetMiles: (c - 2) * 1.25,
+  const nodes: GeoGridNode[] = [];
+  for (let r = 1; r <= 5; r++) {
+    for (let c = 1; c <= 5; c++) {
+      nodes.push({
+        id: `node-${r}-${c}`,
+        gridRow: r,
+        gridCol: c,
         rank: null,
       });
     }
   }
-  return list;
+  return nodes;
+}
+
+interface GeoGridMatrixProps {
+  clientId?: string;
+  clientName?: string;
+  centerAddress?: string | null;
+  keyword?: string | null;
+  scanTimestamp?: string | null;
+  isVerifiedScan?: boolean;
+  nodes?: GeoGridNode[];
+  compact?: boolean;
 }
 
 export default function GeoGridMatrix({
-  clientId,
-  clientName,
+  clientName = 'Selected Client',
   centerAddress,
   keyword,
   scanTimestamp,
-  isVerifiedScan,
-  nodes,
+  isVerifiedScan = false,
+  nodes = buildEmptyGeoGridNodes(),
   compact = false,
 }: GeoGridMatrixProps) {
-  const displayNodes = nodes.length === 25 ? nodes : buildEmptyGeoGridNodes();
-  const [selectedNodeIndex, setSelectedNodeIndex] = useState<number>(12);
+  const [selectedNode, setSelectedNode] = useState<GeoGridNode | null>(null);
 
-  const selectedNode =
-    displayNodes.find((n) => n.nodeIndex === selectedNodeIndex) || displayNodes[12];
-
-  const getNodeStyle = (rank: number | null, isCenter: boolean) => {
-    if (!isVerifiedScan || rank === null || rank <= 0) {
-      return isCenter
-        ? 'bg-amber-50 text-[#0B1F3A] border-[#D99614] font-bold'
-        : 'bg-white/90 text-slate-400 border-[#DCE5EF]';
-    }
-    if (rank <= 3) {
-      return 'bg-emerald-500 text-white border-emerald-600 shadow-sm font-bold';
-    }
-    if (rank <= 10) {
-      return 'bg-amber-500 text-white border-amber-600 shadow-sm font-bold';
-    }
-    return 'bg-rose-500 text-white border-rose-600 shadow-sm font-bold';
+  const getNodeColor = (rank: number | null) => {
+    if (!rank || !isVerifiedScan) return 'bg-slate-100 border-slate-300 text-slate-400';
+    if (rank <= 3) return 'bg-emerald-500 border-emerald-600 text-white font-bold';
+    if (rank <= 10) return 'bg-amber-400 border-amber-500 text-slate-900 font-bold';
+    return 'bg-rose-500 border-rose-600 text-white font-bold';
   };
 
-  const scannedNodes = isVerifiedScan
-    ? displayNodes.filter((n) => typeof n.rank === 'number' && n.rank > 0)
-    : [];
-  const top3Count = scannedNodes.filter((n) => (n.rank as number) <= 3).length;
-  const midCount = scannedNodes.filter(
-    (n) => (n.rank as number) >= 4 && (n.rank as number) <= 10
-  ).length;
-  const lowCount = scannedNodes.filter((n) => (n.rank as number) > 10).length;
-
   return (
-    <div className="bg-white border border-[#DCE5EF] rounded-xl p-6 space-y-5 shadow-sm">
-      {/* Header Bar */}
-      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[#DCE5EF] pb-4">
+    <div className="bg-white border border-[#DCE5EF] rounded-xl p-4 sm:p-6 shadow-sm w-full min-w-0">
+      {/* Header */}
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 border-b border-[#DCE5EF] pb-3 mb-4">
         <div>
-          <div className="flex items-center gap-2.5">
-            <span className="text-[11px] uppercase tracking-wider text-[#0B1F3A] bg-[#F4F7FB] border border-[#DCE5EF] px-2.5 py-0.5 rounded font-bold">
-              OTTERWATCH 5×5 GEO-GRID MATRIX
-            </span>
-            <span
-              className={`font-mono text-[11px] px-2.5 py-0.5 rounded border font-bold ${
-                isVerifiedScan
-                  ? 'bg-emerald-50 text-emerald-800 border-emerald-300'
-                  : 'bg-amber-50 text-amber-800 border-amber-300'
-              }`}
-            >
-              {isVerifiedScan ? '● VERIFIED SERP SCAN' : '○ UNSCANNED SETUP STATE'}
-            </span>
-          </div>
-          <h3 className="text-lg font-bold text-[#0B1F3A] mt-1.5 font-sans">
-            Target Search Query: {keyword ? `"${keyword}"` : 'No Tracked Keyword Configured'}
+          <span className="text-[10px] sm:text-[11px] uppercase text-[#D99614] font-bold block">
+            5×5 LOCAL SERP GEO-GRID MATRIX
+          </span>
+          <h3 className="text-sm sm:text-base font-extrabold text-[#0B1F3A]">
+            {keyword ? `Target: "${keyword}"` : 'Awaiting Active Keyword Scan'}
           </h3>
-          <p className="text-xs text-slate-500 mt-0.5">
-            Center Location Anchor:{' '}
-            <strong className="text-[#0B1F3A]">
-              {centerAddress || 'Primary business address pending'}
-            </strong>{' '}
-            • 25-Node Territory Grid
-          </p>
         </div>
-
-        <div className="text-right">
-          <span className="text-slate-400 block text-[10px] font-bold uppercase">
-            Last Verified Scan
-          </span>
-          <span className="font-mono text-xs font-bold text-[#0B1F3A]">
-            {isVerifiedScan && scanTimestamp ? scanTimestamp : 'Awaiting Initial Scan'}
-          </span>
-        </div>
-      </div>
-
-      {/* Grid + Inspector Split */}
-      <div
-        className={`grid grid-cols-1 ${
-          compact ? '' : 'lg:grid-cols-12'
-        } gap-6 items-start`}
-      >
-        {/* 5x5 Map Canvas */}
-        <div
-          className={`${
-            compact ? '' : 'lg:col-span-7'
-          } relative bg-[#EEF3F9] border border-[#DCE5EF] rounded-xl p-5 overflow-hidden`}
+        <span
+          className={`font-mono text-[10px] px-2 py-0.5 rounded border font-bold ${
+            isVerifiedScan
+              ? 'bg-emerald-50 text-emerald-800 border-emerald-200'
+              : 'bg-slate-100 text-slate-600 border-[#DCE5EF]'
+          }`}
         >
-          {/* Subtle Map Grid Lines Backdrop */}
-          <div
-            className="absolute inset-0 opacity-40 pointer-events-none"
-            style={{
-              backgroundImage:
-                'linear-gradient(to right, #CBD5E1 1px, transparent 1px), linear-gradient(to bottom, #CBD5E1 1px, transparent 1px)',
-              backgroundSize: '40px 40px',
-            }}
-          />
+          {isVerifiedScan ? 'VERIFIED SCAN' : 'UNSCANNED BASELINE'}
+        </span>
+      </div>
 
-          <div className="relative z-10 grid grid-cols-5 gap-3 max-w-[440px] mx-auto">
-            {displayNodes.map((node) => {
-              const isSelected = node.nodeIndex === selectedNodeIndex;
-              const isCenter = node.row === 2 && node.col === 2;
-              return (
-                <button
-                  key={node.nodeIndex}
-                  type="button"
-                  onClick={() => setSelectedNodeIndex(node.nodeIndex)}
-                  className={`aspect-square rounded-xl border-2 flex flex-col items-center justify-center transition-all ${getNodeStyle(
-                    node.rank,
-                    isCenter
-                  )} ${
-                    isSelected
-                      ? 'ring-2 ring-[#0B1F3A] scale-105 shadow-md'
-                      : 'hover:border-[#0B1F3A]/40'
-                  }`}
-                >
-                  <span className="text-[9px] uppercase tracking-tighter opacity-75">
-                    {isCenter ? 'ANCHOR' : `N${node.nodeIndex + 1}`}
-                  </span>
-                  <span className="text-base font-extrabold font-mono">
-                    {isVerifiedScan && typeof node.rank === 'number'
-                      ? `#${node.rank}`
-                      : '—'}
-                  </span>
-                </button>
-              );
-            })}
-          </div>
+      {/* Grid Canvas */}
+      <div className="max-w-[420px] mx-auto">
+        <div className="grid grid-cols-5 gap-1.5 sm:gap-2 aspect-square w-full">
+          {nodes.map((node) => {
+            const isCenter = node.gridRow === 3 && node.gridCol === 3;
+            const isSelected = selectedNode?.id === node.id;
 
-          {/* Distribution Legend */}
-          <div className="relative z-10 mt-4 pt-3 border-t border-[#DCE5EF] bg-white/80 backdrop-blur px-3 py-2 rounded-lg flex flex-wrap items-center justify-between gap-2 text-xs font-semibold">
-            <span className="text-emerald-700 flex items-center gap-1.5">
-              <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 inline-block" />
-              Top 3 Pack: <strong>{isVerifiedScan ? top3Count : '—'}</strong>/25
-            </span>
-            <span className="text-amber-700 flex items-center gap-1.5">
-              <span className="w-2.5 h-2.5 rounded-full bg-amber-500 inline-block" />
-              Rank #4–10: <strong>{isVerifiedScan ? midCount : '—'}</strong>/25
-            </span>
-            <span className="text-rose-700 flex items-center gap-1.5">
-              <span className="w-2.5 h-2.5 rounded-full bg-rose-500 inline-block" />
-              Rank #11+: <strong>{isVerifiedScan ? lowCount : '—'}</strong>/25
-            </span>
+            return (
+              <button
+                key={node.id}
+                type="button"
+                onClick={() => setSelectedNode(node)}
+                aria-label={`Grid node row ${node.gridRow}, col ${node.gridCol}, rank ${
+                  node.rank || 'none'
+                }`}
+                className={`w-full aspect-square min-h-[44px] min-w-[44px] rounded-lg sm:rounded-xl border flex flex-col items-center justify-center transition-all ${getNodeColor(
+                  node.rank
+                )} ${
+                  isSelected ? 'ring-2 ring-[#0B1F3A] scale-105 shadow-md' : 'hover:opacity-90'
+                } ${isCenter ? 'ring-2 ring-[#D99614]' : ''}`}
+              >
+                <span className="text-xs sm:text-sm font-extrabold">
+                  {isVerifiedScan && node.rank ? `#${node.rank}` : '—'}
+                </span>
+                {isCenter && (
+                  <span className="text-[8px] font-bold uppercase tracking-tight text-[#D99614] hidden sm:block">
+                    Center
+                  </span>
+                )}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* Footer Info */}
+      <div className="mt-4 pt-3 border-t border-[#DCE5EF] text-[11px] text-slate-600 flex flex-col sm:flex-row justify-between gap-1">
+        <span className="truncate">
+          Center: {centerAddress || 'Primary address unconfigured'}
+        </span>
+        <span className="font-mono text-slate-500 shrink-0">
+          {scanTimestamp ? `Scanned: ${scanTimestamp}` : 'No verified scan recorded'}
+        </span>
+      </div>
+
+      {/* Mobile Touch Bottom-Sheet Node Details Modal */}
+      {selectedNode && (
+        <div className="fixed inset-0 z-50 bg-[#0B1F3A]/60 backdrop-blur-sm flex items-end sm:items-center justify-center p-0 sm:p-4">
+          <div className="bg-white border border-[#DCE5EF] rounded-t-2xl sm:rounded-2xl max-w-sm w-full p-5 space-y-3 shadow-2xl">
+            <div className="flex items-center justify-between border-b border-[#DCE5EF] pb-2">
+              <h4 className="text-sm font-bold text-[#0B1F3A]">
+                Node Inspector [{selectedNode.gridRow}, {selectedNode.gridCol}]
+              </h4>
+              <button
+                type="button"
+                onClick={() => setSelectedNode(null)}
+                className="text-slate-400 hover:text-slate-700 text-sm font-bold p-1"
+              >
+                ✕
+              </button>
+            </div>
+            <div className="text-xs space-y-1.5">
+              <div className="flex justify-between py-1 border-b border-slate-100">
+                <span className="text-slate-500">Client:</span>
+                <span className="font-bold text-[#0B1F3A]">{clientName}</span>
+              </div>
+              <div className="flex justify-between py-1 border-b border-slate-100">
+                <span className="text-slate-500">Local Map Rank:</span>
+                <span className="font-mono font-bold text-[#0B1F3A]">
+                  {isVerifiedScan && selectedNode.rank ? `#${selectedNode.rank}` : 'Not Scanned'}
+                </span>
+              </div>
+              <div className="flex justify-between py-1">
+                <span className="text-slate-500">Node Status:</span>
+                <span className="font-bold text-slate-700">
+                  {selectedNode.gridRow === 3 && selectedNode.gridCol === 3
+                    ? 'Primary Center Anchor'
+                    : 'Territory Perimeter Point'}
+                </span>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={() => setSelectedNode(null)}
+              className="w-full py-2 bg-[#0B1F3A] text-white font-bold text-xs rounded-lg mt-2"
+            >
+              Done
+            </button>
           </div>
         </div>
-
-        {/* Node Inspector */}
-        {!compact && (
-          <div className="lg:col-span-5 bg-[#F4F7FB] border border-[#DCE5EF] rounded-xl p-5 space-y-4 font-sans">
-            <div className="flex items-center justify-between border-b border-[#DCE5EF] pb-3">
-              <div>
-                <span className="text-[11px] uppercase text-[#D99614] font-bold block">
-                  TERRITORY NODE INSPECTOR • NODE #{selectedNode.nodeIndex + 1}
-                </span>
-                <h4 className="text-base font-bold text-[#0B1F3A]">
-                  {selectedNode.quadrantLabel}
-                </h4>
-              </div>
-              <span className="font-mono text-xs px-3 py-1 rounded-lg bg-white border border-[#DCE5EF] text-[#0B1F3A] font-bold shadow-sm">
-                {isVerifiedScan && typeof selectedNode.rank === 'number'
-                  ? `Rank #${selectedNode.rank}`
-                  : 'Unscanned'}
-              </span>
-            </div>
-
-            {!isVerifiedScan ? (
-              <div className="p-4 rounded-xl bg-white border border-[#DCE5EF] space-y-3">
-                <div className="flex items-center gap-2 text-amber-800 font-bold text-xs">
-                  <span>🔒 No Verified Geo-Grid Scan Recorded</span>
-                </div>
-                <p className="text-xs text-slate-600 leading-relaxed">
-                  <strong>{clientName}</strong> does not yet have a verified 5×5 geo-grid scan in Supabase. OtterWatch never fabricates coordinates or map pack rankings.
-                </p>
-                {clientId && (
-                  <Link
-                    href={`/connection-center?clientId=${encodeURIComponent(clientId)}`}
-                    className="inline-block w-full text-center py-2 px-3 bg-[#0B1F3A] hover:bg-[#16325B] text-white font-semibold rounded-lg text-xs transition-all"
-                  >
-                    Configure GBP & SERP Scanner in Connection Center →
-                  </Link>
-                )}
-              </div>
-            ) : (
-              <div className="p-4 rounded-xl bg-white border border-[#DCE5EF] text-xs space-y-2.5">
-                <div className="flex justify-between py-1 border-b border-slate-100">
-                  <span className="text-slate-500">Observed Map Pack Position:</span>
-                  <strong className="text-[#0B1F3A] font-mono">
-                    {typeof selectedNode.rank === 'number'
-                      ? `#${selectedNode.rank}`
-                      : 'Outside Top 20'}
-                  </strong>
-                </div>
-                <div className="flex justify-between py-1">
-                  <span className="text-slate-500">Local 3-Pack Visibility:</span>
-                  <strong
-                    className={
-                      typeof selectedNode.rank === 'number' && selectedNode.rank <= 3
-                        ? 'text-emerald-700'
-                        : 'text-amber-700'
-                    }
-                  >
-                    {typeof selectedNode.rank === 'number' && selectedNode.rank <= 3
-                      ? 'IN GOOGLE 3-PACK'
-                      : 'DISPLACED OUTSIDE 3-PACK'}
-                  </strong>
-                </div>
-              </div>
-            )}
-          </div>
-        )}
-      </div>
+      )}
     </div>
   );
 }
